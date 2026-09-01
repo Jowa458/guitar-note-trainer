@@ -1,0 +1,54 @@
+.app { width:min(100%,1320px); }
+body,button,input,select,summary { font-family:"Noto Sans TC","Microsoft JhengHei UI","Microsoft JhengHei",system-ui,sans-serif; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+h1 { font-weight:800; letter-spacing:-.025em; line-height:1.12; }
+header p:not(.eyebrow) { color:#cbd4cd; font-size:.96rem; line-height:1.65; letter-spacing:.01em; }
+.eyebrow { font-weight:750; letter-spacing:.11em; }
+.app-tabs { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:0 0 16px; padding:5px; border:1px solid var(--line); border-radius:13px; background:rgba(20,34,27,.72); }
+.app-tabs button { border:1px solid transparent; border-radius:9px; padding:12px 8px; color:#d2dad4; background:transparent; font-size:.98rem; font-weight:750; letter-spacing:.025em; }
+.app-tabs button.active { color:var(--deep); border-color:var(--green); background:var(--green); }
+.tab-page[hidden] { display:none; }
+.score-panel { margin:13px 0; padding:9px 4px 3px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; }
+.score-panel > p { margin:0 0 6px; color:var(--muted); font-size:.72rem; text-align:left; }
+.position-strip { display:none; }
+.position-strip span { display:flex; flex-direction:column; gap:2px; min-width:0; padding:6px 8px; border-left:3px solid #d62f2f; border-radius:3px; background:#f2eedf; }
+.position-strip small { font-size:.62rem; color:#687269; }
+.position-strip b { overflow:hidden; font:700 .82rem/1.2 Arial,sans-serif; white-space:nowrap; text-overflow:ellipsis; }
+.position-strip i { min-width:0; }.position-strip span.current { color:#fff; border-color:#ff6b5f; background:#d62f2f; box-shadow:0 0 0 2px rgba(214,47,47,.2); }.position-strip span.current small { color:#ffe1dd; }
+.vex-score { width:100%; min-height:500px; overflow:hidden; border-radius:8px; background:#fbf7e9; }
+.vex-score svg { display:block; width:100%; height:auto; }
+.measure-label rect { fill:#f2eedf; stroke:#d62f2f; stroke-width:1.5; }.measure-label text { fill:#465248; stroke:none !important; paint-order:normal; font-family:Inter,"Noto Sans TC",Arial,sans-serif; font-size:15px; font-weight:650; letter-spacing:.15px; text-anchor:middle; text-shadow:none; }.measure-label .position-name { fill:#19231d; stroke:none !important; font-size:19px; font-weight:750; letter-spacing:.45px; }.measure-label.current rect { fill:#d62f2f; stroke:#9f1d1d; }.measure-label.current text { fill:#fff; stroke:none !important; }.measure-label.current .position-name { fill:#fff; stroke:none !important; }
+.score-error { padding:30px 15px; color:#9c2525; text-align:center; }
+.sound-options { display:flex; align-items:center; gap:22px; }
+.settings label,.sound-options legend,.settings legend { color:#d4ddd6; font-size:.82rem; font-weight:700; letter-spacing:.015em; }
+.settings select { min-height:43px; color:#fff; font-size:.9rem; font-weight:600; line-height:1.4; }
+.range-label output { font-size:.95rem; font-weight:750; }
+.sound-options legend { margin-bottom:3px; }
+.sound-options label { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:7px; color:var(--ink); }
+.sound-options input { width:18px; height:18px; accent-color:var(--green); }
+.multi-select-panel { border:1px solid var(--line); border-radius:11px; padding:0 10px 10px; color:var(--muted); }
+.multi-select-panel summary { display:flex; align-items:center; gap:8px; padding:12px 1px; color:#fff; cursor:pointer; font-size:.88rem; font-weight:750; letter-spacing:.015em; list-style:none; }
+.multi-select-panel summary::-webkit-details-marker { display:none; }
+.multi-select-panel summary::before { content:'▸'; display:grid; width:21px; height:21px; flex:0 0 21px; place-items:center; border-radius:50%; color:var(--deep); background:var(--green); font-size:.75rem; }
+.multi-select-panel[open] summary::before { content:'▾'; }
+.multi-select-panel summary span { overflow:hidden; margin-left:auto; color:#b8e394; font-size:.82rem; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
+.multi-select-panel p { margin:6px 0 8px; color:#c5cfc7; font-size:.76rem; font-weight:600; line-height:1.55; }
+.multi-choice-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; }
+.multi-choice-grid label { position:relative; display:block; }
+.multi-choice-grid input { position:absolute; opacity:0; }
+.multi-choice-grid span { display:grid; min-height:36px; place-items:center; padding:5px; border:1px solid var(--line); border-radius:7px; color:#d2dad4; font-size:.76rem; font-weight:650; line-height:1.3; text-align:center; }
+.multi-choice-grid input:checked+span { color:var(--deep); border-color:var(--green); background:var(--green); }
+.scale-choices { grid-template-columns:repeat(3,1fr); }
+.transport { display:grid; grid-template-columns:1.4fr 1fr; gap:9px; }
+.transport .secondary { margin-top:0; }
+#fbStartButton { width:100%; border:0; border-radius:10px; padding:13px; color:var(--deep); background:var(--green); font-weight:850; }
+#fbStartButton span { margin-right:6px; }
+.beat-dot.paused { background:transparent; box-shadow:inset 0 0 0 2px var(--orange); }
+.fretboard-practice { display:grid; gap:12px; }
+.fretboard-question { display:grid; min-height:290px; place-content:center; gap:7px; margin:4px 0 8px; border:1px solid rgba(167,216,130,.25); border-radius:16px; background:radial-gradient(circle at 50% 35%,rgba(167,216,130,.14),transparent 62%); }
+.fretboard-question p { margin:0; color:var(--green); font-size:clamp(1.2rem,4vw,1.7rem); font-weight:850; }
+.fretboard-question strong { display:block; color:#fff; font-size:clamp(3.5rem,13vw,6.8rem); line-height:1; letter-spacing:-.05em; }
+.fretboard-question small { margin-top:9px; color:var(--muted); font-size:.78rem; }
+.fretboard-next { display:flex; align-items:center; justify-content:center; gap:9px; margin-top:18px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:rgba(18,32,25,.5); font-size:.78rem; }
+.fretboard-next span { color:var(--green); font-weight:850; }
+.fretboard-next b { color:var(--ink); font-size:.9rem; }
+@media (max-width:520px){.multi-choice-grid{grid-template-columns:repeat(4,1fr)}.scale-choices{grid-template-columns:repeat(2,1fr)}.position-strip b{font-size:.7rem}.position-strip span{padding:5px}.vex-score{min-height:360px}}

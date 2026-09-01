@@ -1,0 +1,10 @@
+{
+  "name": "吉他基礎練習",
+  "short_name": "吉他練習",
+  "description": "CAGED 吉他把位音名反應練習器。",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#18251f",
+  "theme_color": "#18251f",
+  "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#18251f" /><meta name="description" content="CAGED 吉他把位音名反應練習器。" />
+  <link rel="manifest" href="manifest.webmanifest" /><link rel="icon" href="icons/icon.svg" type="image/svg+xml" /><link rel="apple-touch-icon" href="icons/icon.svg" />
+  <link rel="stylesheet" href="styles.css" /><link rel="stylesheet" href="override.css" /><link rel="stylesheet" href="visual.css?v=2" /><title>吉他基礎練習</title>
+</head>
+<body><main class="app">
+  <header><p class="eyebrow">GUITAR NOTE TRAINER</p><h1>吉他基礎練習</h1><p>聽著拍子，看譜，立刻彈出來。</p></header>
+  <nav class="app-tabs" role="tablist" aria-label="練習種類"><button id="positionTabButton" class="active" role="tab" aria-selected="true" aria-controls="positionPage">把位練習</button><button id="fretboardTabButton" role="tab" aria-selected="false" aria-controls="fretboardPage">指板熟悉練習</button></nav>
+  <section id="positionPage" class="tab-page" role="tabpanel" aria-labelledby="positionTabButton">
+  <section class="settings" aria-label="練習設定">
+    <details id="keyDetails" class="multi-select-panel"><summary>調性（可複選）<span id="keySummary"></span></summary><div id="keyChoices" class="multi-choice-grid tonic-choices"></div><p>顯示時會依大調或小調，自動選擇常用調名與調號。</p></details>
+    <details id="scaleDetails" class="multi-select-panel"><summary>音階（可複選）<span id="scaleSummary"></span></summary><div id="scaleChoices" class="multi-choice-grid scale-choices"></div></details>
+    <label>記譜方式<select id="notationMode"><option value="signature">使用調號</option><option value="accidentals">不用調號，全部用臨時升降記號</option></select></label>
+    <div class="setting-grid"><label>出題方式<select id="generatorMode"><option value="musical">樂句模式（依常見音樂規則加權）</option><option value="random">純隨機</option></select></label><label>提示音色<select id="toneInstrument"><option value="piano">鋼琴</option></select></label></div>
+    <fieldset class="sound-options"><legend>聲音</legend><label><input id="metronomeSound" type="checkbox" checked /> 節拍器聲音</label><label><input id="pitchSound" type="checkbox" /> 音高提示音</label></fieldset>
+    <fieldset><legend>練習把位（可複選）</legend><div id="positionChoices"></div></fieldset>
+    <label class="range-label">速度 <output id="bpmValue">80</output> BPM<input id="bpm" type="range" min="40" max="180" value="80" /></label>
+    <div class="setting-grid"><label>一小節<select id="beats"><option value="2">2 拍</option><option value="3">3 拍</option><option value="4" selected>4 拍</option><option value="5">5 拍</option><option value="6">6 拍</option></select></label><label>音符時值<select id="rhythm"><option value="w">全音符</option><option value="h">二分音符</option><option value="q" selected>四分音符</option><option value="8">八分音符</option></select></label></div>
+    <input id="changeMode" type="hidden" value="beat" /><input id="notesPerPosition" type="hidden" value="4" /><output id="notesPerPositionValue" hidden>4</output>
+  </section>
+  <section class="practice" aria-live="polite">
+    <div class="status"><span id="currentPosition">Position 1 · E shape</span><span id="questionCounter">1 / 5</span></div>
+    <div class="beat-dots" id="beatDots" aria-label="拍子指示"></div><p id="scaleDescription">A 大調 · Position 1</p>
+    <div id="scorePanel" class="score-panel"><p>目前兩小節 <span>｜</span> 預告一小節</p><div id="positionStrip" class="position-strip"></div><div id="score" class="vex-score" role="img" aria-label="高音譜號吉他樂譜，紅色音符為目前題目"></div></div>
+    <div class="transport"><button id="startButton"><span>▶</span> 開始節拍</button><button id="resetButton" class="secondary"><span>↺</span> 重置到第一拍</button></div>
+  </section>
+  <p class="hint">第一拍會有較高的提示音；改設定後會從第一拍重新開始。</p>
+  </section>
+  <section id="fretboardPage" class="tab-page" role="tabpanel" aria-labelledby="fretboardTabButton" hidden>
+    <section class="settings" aria-label="指板熟悉練習設定">
+      <label class="range-label">速度 <output id="fbBpmValue">80</output> BPM<input id="fbBpm" type="range" min="40" max="180" value="80" /></label>
+      <fieldset class="sound-options"><legend>聲音</legend><label><input id="fbMetronomeSound" type="checkbox" checked /> 節拍器聲音</label><label><input id="fbPitchSound" type="checkbox" checked /> 播放答案音高</label></fieldset>
+    </section>
+    <section class="practice fretboard-practice" aria-live="polite">
+      <div class="status"><span id="fbMeasureCounter">第 1 小節</span><span id="fbBeatCounter">第 1 拍 / 4</span></div>
+      <div class="beat-dots" id="fbBeatDots" aria-label="指板練習拍子指示"></div>
+      <div class="fretboard-question"><p id="fbStringName">Low E 弦</p><strong id="fbNoteName">F♯ / G♭</strong><small>請找出這條弦上 0–22 格內的所有位置</small><div class="fretboard-next"><span>下一個</span><b id="fbNextQuestion">B 弦 · F</b></div></div>
+      <div class="transport"><button id="fbStartButton"><span>▶</span> 開始節拍</button><button id="fbResetButton" class="secondary"><span>↺</span> 重置到第一拍</button></div>
+    </section>
+    <p class="hint">每小節兩題：前兩拍依序播放較低、較高位置；後兩拍換下一個音名。若只有一個位置，會播放同一音高兩次。</p>
+  </section>
+</main><script src="vendor/vexflow.js?v=5.0.0"></script><script src="app.js?v=68"></script></body></html>

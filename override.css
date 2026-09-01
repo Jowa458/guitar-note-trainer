@@ -1,0 +1,14 @@
+/* Long enharmonic labels, such as F♯ / G♭, need a compact display size. */
+#noteName { font-size: clamp(3rem, 15vw, 5.5rem); letter-spacing: -.05em; white-space: nowrap; }
+.string-guide { display: grid; grid-template-columns: 28px repeat(6, 1fr); margin-bottom: 4px; color: #d9c88e; font: 700 .62rem/1 ui-monospace, monospace; text-align: center; }
+.display-choices { display:flex; gap:18px; color:var(--ink); font-size:.82rem; }.display-choices label { display:flex; align-items:center; gap:6px; }.display-choices input { accent-color:var(--green); }
+.treble-clef { fill:#dce9d6; font:58px serif; }.octave-mark { fill:#dce9d6; font:700 11px serif; }
+#nextHint { margin:10px 0 0; color:var(--orange); font-size:.83rem; font-weight:800; }.score-panel { margin:13px 0; padding:9px 4px 3px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; }.score-panel p { margin:0 0 4px; color:var(--muted); font-size:.68rem; text-align:left; }.score-panel p span { color:var(--orange); padding:0 5px; }.score-panel svg { display:block; width:100%; height:auto; }.score-line,.score-bar { stroke:#dce9d6; stroke-width:1; }.score-note { fill:var(--orange); stroke:#fff4ca; stroke-width:.6; }.score-stem { stroke:var(--orange); stroke-width:2; }.score-label { fill:#dce9d6; font:700 12px ui-monospace,monospace; }.score-preview { opacity:.38; }
+.fretboard-scroll { overflow: visible; padding: 0; }
+.fretboard { display: grid; grid-template-columns: 28px repeat(6, 1fr); grid-template-rows: repeat(25, 22px); width: 100%; min-width: 0; border: 2px solid #d2b466; background: linear-gradient(90deg, #4a2d18, #744526 40%, #472714); box-shadow: inset 0 0 24px #130c07; }
+.fret-corner,.fret-number,.string-name { display: grid; place-items: center; color: #d9c88e; font: 700 .63rem/1 ui-monospace, monospace; }
+.fret-number { border-right: 2px solid #d2b466; border-bottom: 1px solid rgba(238,220,166,.45); }
+.string-name { border-right: 2px solid #d2b466; color: #f6e3a1; font-size: .78rem; }
+.fret-cell { position: relative; border-top: 1px solid rgba(238,220,166,.48); background: linear-gradient(to right, transparent 47%, rgba(244,232,194,.92) 48%, rgba(244,232,194,.92) 52%, transparent 53%); }
+.fret-cell.position-zone { background-color: rgba(167,216,130,.16); box-shadow: inset 0 0 0 1px rgba(167,216,130,.2); }
+.note-marker { position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 24px; height: 24px; transform: translate(-50%,-50%); border: 2px solid #fff6c8; border-radius: 50%; color: #24200c; background: #ffcc39; box-shadow: 0 0 0 3px rgba(255,204,57,.28), 0 0 14px #ffcc39; font-size: .9rem; line-height: 1; }
