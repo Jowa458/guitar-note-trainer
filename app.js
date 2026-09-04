@@ -23,14 +23,17 @@ const OPEN_PITCH_CLASS = [4,9,2,7,11,4];
 const OPEN_MIDI = [40,45,50,55,59,64];
 const DURATION_BEATS = { w:4,h:2,q:1,'8':0.5 };
 const DURATION_SUBDIVISIONS = { w:8,h:4,q:2,'8':1 };
+const SAMPLE_NOTE_NAMES=['C','Cs','D','Ds','E','F','Fs','G','Gs','A','As','B'];
+const SAMPLE_MIDI_MIN=40,SAMPLE_MIDI_MAX=84;
 const SIGNATURE_COUNTS={major:{C:0,G:1,D:2,A:3,E:4,B:5,'F♯':6,'G♭':-6,'D♭':-5,'A♭':-4,'E♭':-3,'B♭':-2,F:-1},minor:{C:-3,'C♯':4,D:-1,'E♭':-6,E:1,F:-4,'F♯':3,G:-2,'G♯':5,A:0,'B♭':-5,B:2}};
 const FRETBOARD_STRINGS=[{label:'Low E 弦',midi:40,pitch:4},{label:'A 弦',midi:45,pitch:9},{label:'D 弦',midi:50,pitch:2},{label:'G 弦',midi:55,pitch:7},{label:'B 弦',midi:59,pitch:11},{label:'High E 弦',midi:64,pitch:4}];
 const CHROMATIC_NAMES=['C','C♯ / D♭','D','D♯ / E♭','E','F','F♯ / G♭','G','G♯ / A♭','A','A♯ / B♭','B'];
 
 const notationMode=$('#notationMode'), generatorMode=$('#generatorMode'), toneInstrument=$('#toneInstrument'), metronomeSound=$('#metronomeSound'), pitchSound=$('#pitchSound'), beatsSelect=$('#beats'), rhythmSelect=$('#rhythm'), bpm=$('#bpm');
 const state={ queue:[], history:[], build:null, running:false, started:false, subdivision:0, lastSubdivision:0, firstTick:true, timer:null, audio:null };
-const fbBpm=$('#fbBpm'),fbMetronomeSound=$('#fbMetronomeSound'),fbPitchSound=$('#fbPitchSound');
+const fbBpm=$('#fbBpm'),fbToneInstrument=$('#fbToneInstrument'),fbMetronomeSound=$('#fbMetronomeSound'),fbPitchSound=$('#fbPitchSound');
 const fbState={questions:[],nextQuestions:[],running:false,started:false,beat:0,lastBeat:0,firstTick:true,measure:1,timer:null};
+const sampleBuffers=new Map(),sampleLoads=new Map();
 const SETTINGS_KEY='guitar-practice-settings-v1';
 let savedActiveTab='position';
 
@@ -47,6 +50,20 @@ function notesPerMeasure(){return +beatsSelect.value/DURATION_BEATS[rhythmSelect
 function choose(list){return list[Math.floor(Math.random()*list.length)]}
 function weightedChoice(items,weightFor){let total=0,weighted=items.map(item=>{const weight=Math.max(0,weightFor(item));total+=weight;return{item,total}}),roll=Math.random()*total;return(weighted.find(entry=>roll<entry.total)||weighted.at(-1)).item}
 function updateDurationOptions(){const beats=+beatsSelect.value;[...rhythmSelect.options].forEach(option=>option.disabled=beats%DURATION_BEATS[option.value]!==0);if(rhythmSelect.options[rhythmSelect.selectedIndex].disabled)rhythmSelect.value='q'}
+function choosePositionIndex(selected,context){
+  if(!context||generatorMode.value==='random'||selected.length===1)return choose(selected);
+  const current=context.positionIndex,currentOffset=POSITIONS[current].offset,groups={same:[],adjacent:[],near:[],far:[]};
+  selected.forEach(index=>{const distance=Math.abs(POSITIONS[index].offset-currentOffset),group=distance===0?'same':distance<=3?'adjacent':distance<=5?'near':'far';groups[group].push(index)});
+  const mass={same:.2,adjacent:.62,near:.14,far:.04};
+  if(!groups.adjacent.length){if(groups.near.length)mass.near+=.45;else if(groups.far.length)mass.far+=.25}
+  const previousDirection=Math.sign(context.lastPositionDelta||0);
+  return weightedChoice(selected,index=>{
+    const distance=Math.abs(POSITIONS[index].offset-currentOffset),group=distance===0?'same':distance<=3?'adjacent':distance<=5?'near':'far',direction=Math.sign(index-current);
+    let weight=mass[group]/groups[group].length;
+    if(direction&&previousDirection)weight*=direction===previousDirection?1.2:.95;
+    return weight*(.9+Math.random()*.2);
+  });
+}
 
 function spelledScale(key,scale){
   const letters='CDEFGAB',root=key.label.replace('♯','#').replace('♭','b'),start=letters.indexOf(root[0]);
@@ -69,20 +86,20 @@ function buildQuestion(first=false){
   const per=notesPerMeasure(),selected=selectedPositions(),combos=selectedCombos();let context=state.build;
   const comboStillSelected=context&&combos.some(combo=>combo.scaleId===context.scaleId&&combo.key.label===context.key.label);
   if(first||!context||context.slot===0||!selected.includes(context.positionIndex)||!comboStillSelected){
-    const alternatives=context?selected.filter(index=>index!==context.positionIndex):selected;
     const otherCombos=context?combos.filter(combo=>combo.scaleId!==context.scaleId||combo.key.label!==context.key.label):combos,combo=choose(otherCombos.length?otherCombos:combos);
-    context={positionIndex:choose(alternatives.length?alternatives:selected),scaleId:combo.scaleId,key:combo.key,slot:0,last:'',lastMidi:context?.lastMidi??null,lastDelta:context?.lastDelta??0};
+    const previousPositionIndex=context?.positionIndex,nextPositionIndex=choosePositionIndex(selected,context),positionDelta=previousPositionIndex==null?0:nextPositionIndex-previousPositionIndex;
+    context={positionIndex:nextPositionIndex,lastPositionDelta:positionDelta||context?.lastPositionDelta||0,scaleId:combo.scaleId,key:combo.key,slot:0,last:'',lastMidi:context?.lastMidi??null,lastDelta:context?.lastDelta??0};
   }
   const position=POSITIONS[context.positionIndex],scale=SCALES[context.scaleId],start=((context.key.pitch-4+12)%12)+position.offset,scaleNotes=spelledScale(context.key,scale),locations=[];
   for(let string=0;string<6;string++)for(let fret=start;fret<=start+3;fret++){const note=scaleNotes.find(item=>item.pitch===(OPEN_PITCH_CLASS[string]+fret)%12);if(note)locations.push({...note,string,fret})}
   const picked=generatorMode.value==='random'?choose(locations):musicalLocation(locations,scaleNotes,context),pickedMidi=OPEN_MIDI[picked.string]+picked.fret;
-  state.build={positionIndex:context.positionIndex,scaleId:context.scaleId,key:context.key,slot:(context.slot+1)%per,last:picked.name,lastMidi:pickedMidi,lastDelta:context.lastMidi==null?0:pickedMidi-context.lastMidi};
+  state.build={positionIndex:context.positionIndex,lastPositionDelta:context.lastPositionDelta||0,scaleId:context.scaleId,key:context.key,slot:(context.slot+1)%per,last:picked.name,lastMidi:pickedMidi,lastDelta:context.lastMidi==null?0:pickedMidi-context.lastMidi};
   return {positionIndex:context.positionIndex,position,scaleId:context.scaleId,key:context.key,picked,slot:context.slot+1};
 }
 
 function fillQueue(){while(state.queue.length<96)state.queue.push(buildQuestion(state.queue.length===0&&!state.history.length))}
 function resetQuestions(){state.queue=[];state.history=[];state.build=null;fillQueue();advanceQuestion()}
-function advanceQuestion(){state.history.push(state.queue.shift());fillQueue();render()}
+function advanceQuestion(){state.history.push(state.queue.shift());fillQueue();render();if(state.audio)void warmPositionSamples()}
 
 function writtenPitch(question){
   const soundingMidi=OPEN_MIDI[question.picked.string]+question.picked.fret;let writtenMidi=soundingMidi+12,octave=Math.floor(writtenMidi/12)-1,diatonic=octave*7+'CDEFGAB'.indexOf(question.picked.letter),octaveShift='';
@@ -136,27 +153,36 @@ function render(){const question=state.history.at(-1);if(!question)return;const 
 
 async function ensureAudio(){state.audio||=new(window.AudioContext||window.webkitAudioContext)();if(state.audio.state==='suspended')await state.audio.resume()}
 function click(accent){const now=state.audio.currentTime,oscillator=state.audio.createOscillator(),gain=state.audio.createGain();oscillator.frequency.value=accent?1120:680;gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(accent?.2:.075,now+.003);gain.gain.exponentialRampToValueAtTime(.001,now+.055);oscillator.connect(gain).connect(state.audio.destination);oscillator.start(now);oscillator.stop(now+.065)}
-function playMidi(midi){const frequency=440*Math.pow(2,(midi-69)/12),now=state.audio.currentTime,harmonics=[[1,.16],[2,.055],[3,.022]];harmonics.forEach(([multiple,level],index)=>{const oscillator=state.audio.createOscillator(),gain=state.audio.createGain();oscillator.type=index?'sine':'triangle';oscillator.frequency.value=frequency*multiple;gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(level,now+.008);gain.gain.exponentialRampToValueAtTime(level*.32,now+.12);gain.gain.exponentialRampToValueAtTime(.001,now+.7);oscillator.connect(gain).connect(state.audio.destination);oscillator.start(now);oscillator.stop(now+.72)})}
-function playPitch(question){playMidi(OPEN_MIDI[question.picked.string]+question.picked.fret)}
+function sampleInfo(midi){const baseMidi=Math.max(SAMPLE_MIDI_MIN,Math.min(SAMPLE_MIDI_MAX,midi)),name=SAMPLE_NOTE_NAMES[baseMidi%12],octave=Math.floor(baseMidi/12)-1;return{baseMidi,file:`${name}${octave}.mp3`,rate:Math.pow(2,(midi-baseMidi)/12)}}
+async function loadSample(instrument,midi){const info=sampleInfo(midi),key=`${instrument}:${info.baseMidi}`;if(sampleBuffers.has(key))return{buffer:sampleBuffers.get(key),info};if(!sampleLoads.has(key))sampleLoads.set(key,fetch(`${instrument}/${info.file}`).then(response=>{if(!response.ok)throw new Error(`Unable to load ${instrument}/${info.file}`);return response.arrayBuffer()}).then(data=>state.audio.decodeAudioData(data)).then(buffer=>{sampleBuffers.set(key,buffer);sampleLoads.delete(key);return buffer}).catch(error=>{sampleLoads.delete(key);throw error}));return{buffer:await sampleLoads.get(key),info}}
+function playFallbackMidi(midi,duration){const frequency=440*Math.pow(2,(midi-69)/12),now=state.audio.currentTime,oscillator=state.audio.createOscillator(),gain=state.audio.createGain();oscillator.type='triangle';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(.13,now+.008);gain.gain.exponentialRampToValueAtTime(.001,now+duration);oscillator.connect(gain).connect(state.audio.destination);oscillator.start(now);oscillator.stop(now+duration+.03)}
+function playSample(buffer,rate,instrument,duration){const now=state.audio.currentTime,source=state.audio.createBufferSource(),gain=state.audio.createGain(),release=Math.max(.3,duration),level=instrument==='eguitar'?.42:.52;source.buffer=buffer;source.playbackRate.value=rate;gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(level,now+.012);gain.gain.setValueAtTime(level,now+Math.max(.02,release-.12));gain.gain.exponentialRampToValueAtTime(.001,now+release);source.connect(gain).connect(state.audio.destination);source.start(now);source.stop(now+release+.03)}
+function playMidi(midi,instrument,duration){const info=sampleInfo(midi),key=`${instrument}:${info.baseMidi}`,cached=sampleBuffers.get(key);if(cached){playSample(cached,info.rate,instrument,duration);return}loadSample(instrument,midi).then(({buffer,info:loadedInfo})=>playSample(buffer,loadedInfo.rate,instrument,duration)).catch(()=>playFallbackMidi(midi,duration))}
+async function preloadSamples(midis,instrument){await Promise.allSettled([...new Set(midis)].map(midi=>loadSample(instrument,midi)))}
+function positionPreviewMidis(){return[state.history.at(-1),...state.queue.slice(0,5)].filter(Boolean).map(question=>OPEN_MIDI[question.picked.string]+question.picked.fret)}
+function fretboardPreviewMidis(){return[...fbState.questions,...fbState.nextQuestions].flatMap(question=>question.midis)}
+function warmPositionSamples(){return pitchSound.checked&&state.audio?preloadSamples(positionPreviewMidis(),toneInstrument.value):Promise.resolve()}
+function warmFretboardSamples(){return fbPitchSound.checked&&state.audio?preloadSamples(fretboardPreviewMidis(),fbToneInstrument.value):Promise.resolve()}
+function playPitch(question){const seconds=Math.max(.32,Math.min(3,DURATION_BEATS[rhythmSelect.value]*60/+bpm.value*.9));playMidi(OPEN_MIDI[question.picked.string]+question.picked.fret,toneInstrument.value,seconds)}
 function tick(){const total=+beatsSelect.value*2,current=state.subdivision,quarterBoundary=current%2===0,noteBoundary=current%DURATION_SUBDIVISIONS[rhythmSelect.value]===0;if(quarterBoundary&&metronomeSound.checked)click(current===0);if(noteBoundary){if(!state.firstTick)advanceQuestion();if(pitchSound.checked)playPitch(state.history.at(-1))}state.lastSubdivision=current;state.firstTick=false;drawBeatDots();state.subdivision=(current+1)%total}
-async function start(){await ensureAudio();state.running=true;state.started=true;$('#startButton').innerHTML='<span>■</span> 暫停';tick();state.timer=setInterval(tick,60000/+bpm.value/2)}
+async function start(){await ensureAudio();if(pitchSound.checked){$('#startButton').innerHTML='<span>…</span> 載入音源';await warmPositionSamples()}state.running=true;state.started=true;$('#startButton').innerHTML='<span>■</span> 暫停';tick();state.timer=setInterval(tick,60000/+bpm.value/2)}
 function pause(){clearInterval(state.timer);state.timer=null;state.running=false;$('#startButton').innerHTML='<span>▶</span> 繼續';drawBeatDots()}
 async function resetTransport(keepRunning=state.running){if(state.running)pause();updateDurationOptions();resetQuestions();state.subdivision=0;state.lastSubdivision=0;state.firstTick=true;state.started=false;$('#startButton').innerHTML='<span>▶</span> 開始節拍';drawBeatDots();if(keepRunning)await start()}
 function makeFretboardQuestion(excluded){let question;do{const stringIndex=Math.floor(Math.random()*FRETBOARD_STRINGS.length),pitch=Math.floor(Math.random()*12),string=FRETBOARD_STRINGS[stringIndex],frets=[];for(let fret=0;fret<=22;fret++)if((string.pitch+fret)%12===pitch)frets.push(fret);question={stringIndex,string,pitch,name:CHROMATIC_NAMES[pitch],frets,midis:[string.midi+frets[0],string.midi+(frets[1]??frets[0])]}}while(excluded&&question.pitch===excluded.pitch);return question}
 function makeFretboardPair(previous){const first=makeFretboardQuestion(previous),second=makeFretboardQuestion(first);return[first,second]}
-function createFretboardMeasure(){fbState.questions=fbState.nextQuestions.length?fbState.nextQuestions:makeFretboardPair(null);fbState.nextQuestions=makeFretboardPair(fbState.questions[1])}
+function createFretboardMeasure(){fbState.questions=fbState.nextQuestions.length?fbState.nextQuestions:makeFretboardPair(null);fbState.nextQuestions=makeFretboardPair(fbState.questions[1]);if(state.audio)void warmFretboardSamples()}
 function drawFretboardDots(displayBeat=fbState.lastBeat){const root=$('#fbBeatDots');root.innerHTML='';for(let beat=0;beat<4;beat++){const marker=beat===displayBeat?(fbState.running?'active':fbState.started?'paused':''):'';root.insertAdjacentHTML('beforeend',`<i class="beat-dot ${marker}"></i>`)}}
 function renderFretboard(displayBeat=fbState.running?fbState.lastBeat:fbState.beat){const question=fbState.questions[displayBeat<2?0:1],next=displayBeat<2?fbState.questions[1]:fbState.nextQuestions[0];if(!question)return;$('#fbStringName').textContent=question.string.label;$('#fbNoteName').textContent=question.name;$('#fbNextQuestion').textContent=`${next.string.label} · ${next.name}`;$('#fbMeasureCounter').textContent=`第 ${fbState.measure} 小節`;$('#fbBeatCounter').textContent=`第 ${displayBeat+1} 拍 / 4`;drawFretboardDots(displayBeat)}
-function fretboardTick(){const current=fbState.beat;if(current===0&&!fbState.firstTick){fbState.measure++;createFretboardMeasure()}const question=fbState.questions[current<2?0:1];if(fbMetronomeSound.checked)click(current===0);if(fbPitchSound.checked)playMidi(question.midis[current%2]);fbState.lastBeat=current;fbState.firstTick=false;renderFretboard(current);fbState.beat=(current+1)%4}
-async function startFretboard(){await ensureAudio();fbState.running=true;fbState.started=true;$('#fbStartButton').innerHTML='<span>■</span> 暫停';fretboardTick();fbState.timer=setInterval(fretboardTick,60000/+fbBpm.value)}
+function fretboardTick(){const current=fbState.beat;if(current===0&&!fbState.firstTick){fbState.measure++;createFretboardMeasure()}const question=fbState.questions[current<2?0:1];if(fbMetronomeSound.checked)click(current===0);if(fbPitchSound.checked)playMidi(question.midis[current%2],fbToneInstrument.value,Math.max(.32,Math.min(1.8,60/+fbBpm.value*.9)));fbState.lastBeat=current;fbState.firstTick=false;renderFretboard(current);fbState.beat=(current+1)%4}
+async function startFretboard(){await ensureAudio();if(fbPitchSound.checked){$('#fbStartButton').innerHTML='<span>…</span> 載入音源';await warmFretboardSamples()}fbState.running=true;fbState.started=true;$('#fbStartButton').innerHTML='<span>■</span> 暫停';fretboardTick();fbState.timer=setInterval(fretboardTick,60000/+fbBpm.value)}
 function pauseFretboard(){clearInterval(fbState.timer);fbState.timer=null;fbState.running=false;$('#fbStartButton').innerHTML='<span>▶</span> 繼續';drawFretboardDots(fbState.lastBeat)}
 async function resetFretboard(keepRunning=fbState.running){if(fbState.running)pauseFretboard();fbState.beat=0;fbState.lastBeat=0;fbState.firstTick=true;fbState.measure=1;fbState.started=false;fbState.questions=[];fbState.nextQuestions=[];createFretboardMeasure();$('#fbStartButton').innerHTML='<span>▶</span> 開始節拍';renderFretboard(0);if(keepRunning)await startFretboard()}
 function setActiveTab(name,persist=true){const position=name==='position';if(position&&fbState.running)pauseFretboard();if(!position&&state.running)pause();$('#positionPage').hidden=!position;$('#fretboardPage').hidden=position;$('#positionTabButton').classList.toggle('active',position);$('#fretboardTabButton').classList.toggle('active',!position);$('#positionTabButton').setAttribute('aria-selected',String(position));$('#fretboardTabButton').setAttribute('aria-selected',String(!position));savedActiveTab=position?'position':'fretboard';if(persist)saveSettings()}
 function updateSummaries(){const keys=selectedTonicPitches().map(pitch=>TONIC_CHOICES.find(choice=>choice[1]===pitch)[0]),scales=selectedScaleIds().map(id=>SCALES[id].label);$('#keySummary').textContent=keys.length<=3?keys.join('、'):`已選 ${keys.length} 個調`;$('#scaleSummary').textContent=scales.length<=3?scales.join('、'):`已選 ${scales.length} 種`}
-function saveSettings(){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify({keys:checkedValues('#keyChoices'),scales:selectedScaleIds(),positions:[...document.querySelectorAll('#positionChoices input:checked')].map(input=>input.value),notationMode:notationMode.value,generatorMode:generatorMode.value,toneInstrument:toneInstrument.value,metronomeSound:metronomeSound.checked,pitchSound:pitchSound.checked,bpm:bpm.value,beats:beatsSelect.value,rhythm:rhythmSelect.value,keyOpen:$('#keyDetails').open,scaleOpen:$('#scaleDetails').open,activeTab:savedActiveTab,fbBpm:fbBpm.value,fbMetronomeSound:fbMetronomeSound.checked,fbPitchSound:fbPitchSound.checked}))}catch(error){console.warn('Settings could not be saved',error)}}
+function saveSettings(){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify({keys:checkedValues('#keyChoices'),scales:selectedScaleIds(),positions:[...document.querySelectorAll('#positionChoices input:checked')].map(input=>input.value),notationMode:notationMode.value,generatorMode:generatorMode.value,toneInstrument:toneInstrument.value,metronomeSound:metronomeSound.checked,pitchSound:pitchSound.checked,bpm:bpm.value,beats:beatsSelect.value,rhythm:rhythmSelect.value,keyOpen:$('#keyDetails').open,scaleOpen:$('#scaleDetails').open,activeTab:savedActiveTab,fbBpm:fbBpm.value,fbToneInstrument:fbToneInstrument.value,fbMetronomeSound:fbMetronomeSound.checked,fbPitchSound:fbPitchSound.checked}))}catch(error){console.warn('Settings could not be saved',error)}}
 function restoreChecks(selector,values){if(!Array.isArray(values))return;document.querySelectorAll(`${selector} input`).forEach(input=>input.checked=values.includes(input.value))}
 function restoreSelect(control,value){if(value!=null&&[...control.options].some(option=>option.value===String(value)))control.value=String(value)}
-function loadSettings(){try{const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null');if(!settings)return;const migratedKeys=settings.keys||[...(settings.majorKeys||[]),...(settings.minorKeys||[])].map(value=>String(value).split('|').at(-1)).filter((value,index,array)=>array.indexOf(value)===index);restoreChecks('#keyChoices',migratedKeys);restoreChecks('#scaleChoices',settings.scales);restoreChecks('#positionChoices',settings.positions);restoreSelect(notationMode,settings.notationMode);restoreSelect(generatorMode,settings.generatorMode);restoreSelect(toneInstrument,settings.toneInstrument);restoreSelect(beatsSelect,settings.beats);restoreSelect(rhythmSelect,settings.rhythm);if(settings.bpm!=null)bpm.value=settings.bpm;if(settings.fbBpm!=null)fbBpm.value=settings.fbBpm;if(typeof settings.metronomeSound==='boolean')metronomeSound.checked=settings.metronomeSound;if(typeof settings.pitchSound==='boolean')pitchSound.checked=settings.pitchSound;if(typeof settings.fbMetronomeSound==='boolean')fbMetronomeSound.checked=settings.fbMetronomeSound;if(typeof settings.fbPitchSound==='boolean')fbPitchSound.checked=settings.fbPitchSound;if(settings.activeTab==='fretboard')savedActiveTab='fretboard';$('#keyDetails').open=!!settings.keyOpen;$('#scaleDetails').open=!!settings.scaleOpen}catch(error){console.warn('Settings could not be loaded',error)}}
+function loadSettings(){try{const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null');if(!settings)return;const migratedKeys=settings.keys||[...(settings.majorKeys||[]),...(settings.minorKeys||[])].map(value=>String(value).split('|').at(-1)).filter((value,index,array)=>array.indexOf(value)===index);restoreChecks('#keyChoices',migratedKeys);restoreChecks('#scaleChoices',settings.scales);restoreChecks('#positionChoices',settings.positions);restoreSelect(notationMode,settings.notationMode);restoreSelect(generatorMode,settings.generatorMode);restoreSelect(toneInstrument,settings.toneInstrument);restoreSelect(fbToneInstrument,settings.fbToneInstrument);restoreSelect(beatsSelect,settings.beats);restoreSelect(rhythmSelect,settings.rhythm);if(settings.bpm!=null)bpm.value=settings.bpm;if(settings.fbBpm!=null)fbBpm.value=settings.fbBpm;if(typeof settings.metronomeSound==='boolean')metronomeSound.checked=settings.metronomeSound;if(typeof settings.pitchSound==='boolean')pitchSound.checked=settings.pitchSound;if(typeof settings.fbMetronomeSound==='boolean')fbMetronomeSound.checked=settings.fbMetronomeSound;if(typeof settings.fbPitchSound==='boolean')fbPitchSound.checked=settings.fbPitchSound;if(settings.activeTab==='fretboard')savedActiveTab='fretboard';$('#keyDetails').open=!!settings.keyOpen;$('#scaleDetails').open=!!settings.scaleOpen}catch(error){console.warn('Settings could not be loaded',error)}}
 function ensureChecked(selector,fallback){const inputs=[...document.querySelectorAll(`${selector} input`)];if(!inputs.some(input=>input.checked)){const preferred=inputs.find(input=>input.value===fallback)||inputs[0];preferred.checked=true}}
 function restart(){updateDurationOptions();updateSummaries();saveSettings();resetTransport(state.running)}
 
@@ -169,8 +195,12 @@ $('#fretboardTabButton').onclick=()=>setActiveTab('fretboard');
 bpm.oninput=async()=>{$('#bpmValue').textContent=bpm.value;saveSettings();if(state.running){pause();await start()}};
 fbBpm.oninput=async()=>{$('#fbBpmValue').textContent=fbBpm.value;saveSettings();if(fbState.running){pauseFretboard();await startFretboard()}};
 [notationMode,generatorMode,beatsSelect,rhythmSelect].forEach(control=>control.onchange=restart);
-[toneInstrument,metronomeSound,pitchSound].forEach(control=>control.onchange=saveSettings);
-[fbMetronomeSound,fbPitchSound].forEach(control=>control.onchange=saveSettings);
+toneInstrument.onchange=()=>{saveSettings();if(state.audio)void warmPositionSamples()};
+pitchSound.onchange=()=>{saveSettings();if(state.audio)void warmPositionSamples()};
+metronomeSound.onchange=saveSettings;
+fbToneInstrument.onchange=()=>{saveSettings();if(state.audio)void warmFretboardSamples()};
+fbPitchSound.onchange=()=>{saveSettings();if(state.audio)void warmFretboardSamples()};
+fbMetronomeSound.onchange=saveSettings;
 document.querySelectorAll('#positionChoices input').forEach(control=>control.onchange=()=>{ensureChecked('#positionChoices','0');restart()});
 document.querySelectorAll('#keyChoices input').forEach(control=>control.onchange=()=>{ensureChecked('#keyChoices','9');restart()});
 document.querySelectorAll('#scaleChoices input').forEach(control=>control.onchange=()=>{ensureChecked('#scaleChoices','major');restart()});

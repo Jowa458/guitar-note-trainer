@@ -14,7 +14,7 @@
     <details id="keyDetails" class="multi-select-panel"><summary>調性（可複選）<span id="keySummary"></span></summary><div id="keyChoices" class="multi-choice-grid tonic-choices"></div><p>顯示時會依大調或小調，自動選擇常用調名與調號。</p></details>
     <details id="scaleDetails" class="multi-select-panel"><summary>音階（可複選）<span id="scaleSummary"></span></summary><div id="scaleChoices" class="multi-choice-grid scale-choices"></div></details>
     <label>記譜方式<select id="notationMode"><option value="signature">使用調號</option><option value="accidentals">不用調號，全部用臨時升降記號</option></select></label>
-    <div class="setting-grid"><label>出題方式<select id="generatorMode"><option value="musical">樂句模式（依常見音樂規則加權）</option><option value="random">純隨機</option></select></label><label>提示音色<select id="toneInstrument"><option value="piano">鋼琴</option></select></label></div>
+    <div class="setting-grid"><label>出題方式<select id="generatorMode"><option value="musical">樂句模式（依常見音樂規則加權）</option><option value="random">純隨機</option></select></label><label>提示音色<select id="toneInstrument"><option value="guitar">吉他</option><option value="eguitar">電吉他</option></select></label></div>
     <fieldset class="sound-options"><legend>聲音</legend><label><input id="metronomeSound" type="checkbox" checked /> 節拍器聲音</label><label><input id="pitchSound" type="checkbox" /> 音高提示音</label></fieldset>
     <fieldset><legend>練習把位（可複選）</legend><div id="positionChoices"></div></fieldset>
     <label class="range-label">速度 <output id="bpmValue">80</output> BPM<input id="bpm" type="range" min="40" max="180" value="80" /></label>
@@ -31,7 +31,7 @@
   </section>
   <section id="fretboardPage" class="tab-page" role="tabpanel" aria-labelledby="fretboardTabButton" hidden>
     <section class="settings" aria-label="指板熟悉練習設定">
-      <label class="range-label">速度 <output id="fbBpmValue">80</output> BPM<input id="fbBpm" type="range" min="40" max="180" value="80" /></label>
+      <div class="setting-grid"><label class="range-label">速度 <output id="fbBpmValue">80</output> BPM<input id="fbBpm" type="range" min="40" max="180" value="80" /></label><label>提示音色<select id="fbToneInstrument"><option value="guitar">吉他</option><option value="eguitar">電吉他</option></select></label></div>
       <fieldset class="sound-options"><legend>聲音</legend><label><input id="fbMetronomeSound" type="checkbox" checked /> 節拍器聲音</label><label><input id="fbPitchSound" type="checkbox" checked /> 播放答案音高</label></fieldset>
     </section>
     <section class="practice fretboard-practice" aria-live="polite">
@@ -42,4 +42,4 @@
     </section>
     <p class="hint">每小節兩題：前兩拍依序播放較低、較高位置；後兩拍換下一個音名。若只有一個位置，會播放同一音高兩次。</p>
   </section>
-</main><script src="vendor/vexflow.js?v=5.0.0"></script><script src="app.js?v=68"></script></body></html>
+</main><script src="vendor/vexflow.js?v=5.0.0"></script><script src="app.js?v=72"></script></body></html>
