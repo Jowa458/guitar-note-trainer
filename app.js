@@ -1,10 +1,10 @@
 const $ = selector => document.querySelector(selector);
 const POSITIONS = [
-  { number: 1, shape: 'E shape', offset: 0 },
-  { number: 2, shape: 'D shape', offset: 2 },
-  { number: 3, shape: 'C shape', offset: 4 },
-  { number: 4, shape: 'A shape', offset: 7 },
-  { number: 5, shape: 'G shape', offset: 9 },
+  { number: 1, shape: 'E shape', offset: 0, rootString: 6, direction: 'down' },
+  { number: 2, shape: 'D shape', offset: 2, rootString: 4, direction: 'down' },
+  { number: 3, shape: 'C shape', offset: 4, rootString: 5, direction: 'up' },
+  { number: 4, shape: 'A shape', offset: 7, rootString: 5, direction: 'down' },
+  { number: 5, shape: 'G shape', offset: 9, rootString: 6, direction: 'up' },
 ];
 const MAJOR_KEYS = [['C',0],['G',7],['D',2],['A',9],['E',4],['B',11],['F♯',6],['G♭',6],['D♭',1],['A♭',8],['E♭',3],['B♭',10],['F',5]];
 const MINOR_KEYS = [['C',0],['C♯',1],['D',2],['E♭',3],['E',4],['F',5],['F♯',6],['G',7],['G♯',8],['A',9],['B♭',10],['B',11]];
@@ -143,7 +143,9 @@ function renderScore(){
   const currentMeasure=Math.floor((currentIndex-page)/per),strip=$('#positionStrip');strip.innerHTML='';
   $('#scorePanel > p').textContent='目前 2 小節　｜　預告 1 小節';
   const svg=target.querySelector('svg');svg.setAttribute('viewBox',`0 0 ${logicalWidth} ${height}`);svg.setAttribute('preserveAspectRatio','xMinYMin meet');svg.style.width='100%';svg.style.height='auto';
-  const labelMarkup=labels.map((question,index)=>{const x=8+header+index*minMeasureWidth,current=index===currentMeasure,scale=SCALES[question.scaleId],tonic=`${question.key.label}${scale.minor?'m':''}`;return `<g class="measure-label ${current?'current':''}"><rect x="${x+2}" y="10" width="${minMeasureWidth-4}" height="58" rx="7"/><text x="${x+minMeasureWidth/2}" y="32">${tonic} · ${scale.label}</text><text class="position-name" x="${x+minMeasureWidth/2}" y="56">P${question.position.number} · ${question.position.shape}</text></g>`}).join('');
+  const labelMarkup=labels.map((question,index)=>{const x=8+header+index*minMeasureWidth,scale=SCALES[question.scaleId],tonic=`${question.key.label}${scale.minor?'m':''}`;return `<g class="measure-label"><text x="${x+minMeasureWidth/2}" y="28">${tonic} · ${scale.label}</text></g>`}).join('');
+  const stringLines=Array.from({length:6},(_,index)=>`<line x1="${12+index*10}" y1="13" x2="${12+index*10}" y2="69"/>`).join(''),fretLines=[13,27,41,55,69].map(y=>`<line x1="8" y1="${y}" x2="66" y2="${y}"/>`).join('');
+  $('#positionCues').innerHTML=labels.map((question,index)=>{const position=question.position,stringX=12+(6-position.rootString)*10,arrow=position.direction==='up'?'<path d="M 37 36 V 15 M 37 15 l -5 6 M 37 15 l 5 6"/>':'<path d="M 37 46 V 67 M 37 67 l -5 -6 M 37 67 l 5 -6"/>',numbers=[6,5,4,3,2,1].map((number,stringIndex)=>`<text${number===position.rootString?' class="root-string-number"':''} x="${12+stringIndex*10}" y="80">${number}</text>`).join(''),current=index===currentMeasure;return `<div class="position-cue-dom${current?' current':''}" aria-label="Position ${position.number} ${position.shape}，${position.rootString} 弦根音，往${position.direction==='up'?'上':'下'}按"${current?' aria-current="true"':''}><svg class="mini-position-tab" viewBox="0 0 74 84" aria-hidden="true"><g class="mini-grid">${stringLines}${fretLines}</g><g class="mini-arrow">${arrow}</g><circle class="mini-root" cx="${stringX}" cy="41" r="5.5"/>${numbers}</svg></div>`}).join('');
   svg.insertAdjacentHTML('afterbegin',labelMarkup);
   const octaveMarkup=octaveMarks.map(mark=>{const top=mark.shift==='8va',textY=top?140:316,lineY=top?135:311,hook=top?7:-7,line=mark.single?'':`<path d="M ${mark.x1+20} ${lineY} H ${mark.x2+9} v ${hook}" fill="none" stroke="#26332a" stroke-width="1.5" stroke-dasharray="5 4"/>`;return `<g class="octave-mark"><text x="${mark.x1-8}" y="${textY}" fill="#26332a" font-family="Arial,sans-serif" font-size="11" font-weight="700">${mark.shift}</text>${line}</g>`}).join('');
   svg.insertAdjacentHTML('beforeend',octaveMarkup);
