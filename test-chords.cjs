@@ -37,7 +37,14 @@ vm.runInContext(app.slice(0,app.indexOf('const notationMode='))+
   ch.pool=[0,7].flatMap(key=>diatonicChords(key,'major','triads').flatMap(q=>{const vs=chordVoicings(q.root,q.type,0);return vs.length?[{...q,positionIndex:0,voicings:vs}]:[]}));
   rhythm='h';ch.queue=[];ch.index=50;fillChords();
   for(let i=0;i+1<ch.queue.length;i+=2)assert.equal(ch.queue[i].contextId,ch.queue[i+1].contextId);
-  console.log(JSON.stringify({voicings,musical,random,diatonic:'passed'},null,2));
+  const settings={diatonic:true,manual:true,keys:[0],scales:['major'],families:['triads'],manualRoots:[0],manualTypes:['7','major'],positions:[0,1,2,3,4]};
+  const mixed=buildChordPool(settings);
+  assert(mixed.some(q=>q.root===0&&q.type.id==='7'&&q.manual));
+  assert(mixed.some(q=>q.root===2&&q.type.id==='m'&&!q.manual));
+  assert.equal(mixed.length,new Set(mixed.map(q=>[q.contextId,q.root,q.type.id,q.positionIndex].join(':'))).size);
+  assert(buildChordPool({...settings,diatonic:false}).every(q=>q.root===0&&['7','major'].includes(q.type.id)));
+  assert(!buildChordPool({...settings,manual:false}).some(q=>q.root===0&&q.type.id==='7'));
+  console.log(JSON.stringify({voicings,musical,random,diatonic:'passed',mixed:'passed'},null,2));
 `,ctx);
 const timing=vm.createContext({assert});
 vm.runInContext(`

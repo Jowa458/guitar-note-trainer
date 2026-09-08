@@ -67,17 +67,37 @@ function diatonicChords(pitch,scaleId,family){
     });
   });
 }
+function buildChordPool(options){
+  const {diatonic,manual,keys,scales,families,manualRoots,manualTypes,positions}=options,pool=[];
+  if(diatonic)for(const key of keys)for(const scale of scales)for(const family of families)
+    for(const item of diatonicChords(key,scale,family))for(const positionIndex of positions){
+      const voicings=chordVoicings(item.root,item.type,positionIndex);if(voicings.length)pool.push({...item,positionIndex,voicings});
+    }
+  const contexts=[...new Map(pool.map(q=>[q.contextId,{contextId:q.contextId,contextLabel:q.contextLabel}])).values()];
+  if(!contexts.length)contexts.push({contextId:'manual',contextLabel:'自選和弦'});
+  if(manual)for(const root of manualRoots)for(const id of manualTypes){
+    const type=CHORD_TYPES.find(t=>t.id===id);if(!type)continue;
+    for(const positionIndex of positions){const voicings=chordVoicings(root,type,positionIndex);if(!voicings.length)continue;
+      for(const context of contexts)if(!pool.some(q=>q.contextId===context.contextId&&q.root===root&&q.type.id===id&&q.positionIndex===positionIndex))
+        pool.push({root,type,positionIndex,voicings,...context,manual:true});
+    }
+  }
+  return pool;
+}
 function chordsPerMeasure(){return 4/DURATION_BEATS[chValue('Rhythm')]}
 const chordPage=document.createElement('section');chordPage.id='chordPage';chordPage.className='tab-page';chordPage.hidden=true;chordPage.setAttribute('role','tabpanel');chordPage.setAttribute('aria-labelledby','chordTabButton');
 chordPage.innerHTML=`<section class="settings" aria-label="和弦練習設定">
+  <fieldset><legend>和弦來源（可同時勾選）</legend><div id="chSources" class="multi-choice-grid"><label><input type="checkbox" value="diatonic" checked><span>順階和弦</span></label><label><input type="checkbox" value="manual"><span>加入自選和弦</span></label></div></fieldset>
+  <details class="multi-select-panel" id="chManualRootsPanel"><summary>和弦根音（可複選）<span id="chManualRootSummary"></span></summary><div class="multi-choice-grid" id="chManualRoots"></div></details>
+  <details class="multi-select-panel" id="chManualTypesPanel"><summary>自選和弦種類（分類複選）<span id="chManualTypeSummary"></span></summary><div id="chManualTypes"></div></details>
   <details class="multi-select-panel" id="chRootsPanel"><summary>調性（可複選）<span id="chRootSummary"></span></summary><div class="multi-choice-grid" id="chRoots"></div></details>
   <details class="multi-select-panel" id="chScalesPanel"><summary>音階（可複選）<span id="chScaleSummary"></span></summary><div class="multi-choice-grid" id="chScales"></div></details>\n  <details class="multi-select-panel" id="chTypesPanel"><summary>順階和弦類別（可複選）<span id="chTypeSummary"></span></summary><div id="chTypes"></div></details>
   <fieldset><legend>把位（可複選）</legend><div class="multi-choice-grid" id="chPositions"></div></fieldset>
   <div class="setting-grid"><label>出題方式<select id="chMode"><option value="musical">順暢換把（加權）</option><option value="random">純隨機</option></select></label><label>提示音色<select id="chTone"><option value="guitar">吉他</option><option value="eguitar">電吉他</option></select></label></div>
   <label class="range-label">速度 <output id="chBpmValue">80</output> BPM<input id="chBpm" type="range" min="40" max="180" value="80"></label>
-  <input id="chBeats" type="hidden" value="4"><div class="setting-grid"><span>固定 4/4 拍</span><label>換和弦頻率<select id="chRhythm"><option value="w">每小節一次（全音符）</option><option value="h">每小節兩次（二分音符）</option></select></label></div>
+  <input id="chBeats" type="hidden" value="4"><div class="setting-grid"><label>換和弦頻率<select id="chRhythm"><option value="w">每小節一次（全音符）</option><option value="h">每小節兩次（二分音符）</option></select></label></div>
   <fieldset class="sound-options"><legend>聲音與答案</legend><label><input type="checkbox" id="chClick" checked>節拍器</label><label><input type="checkbox" id="chSound">和弦提示音</label><label><input type="checkbox" id="chAnswer" checked>顯示答案</label></fieldset>
-  <p class="hint">依所選調性與音階自動產生順階和弦。同一小節維持同一調性／音階，下一小節可切換；僅出收錄的實用指法，省略音會註明，X 弦不彈。</p>
+  <p class="hint" id="chSourceHint">依所選調性與音階自動產生順階和弦。同一小節維持同一調性／音階，下一小節可切換；僅出收錄的實用指法，省略音會註明，X 弦不彈。</p>
   <p id="chAvailability" role="status"></p>
 </section><section class="practice"><div class="status"><span id="chCurrent"></span><span id="chBeat"></span></div><div class="beat-dots" id="chDots"></div><p>目前 2 小節 ｜ 預告 1 小節</p><div id="chCards" class="ch-cards"></div><div id="chScore" class="vex-score"></div><div class="transport"><button id="chStart">▶ 開始節拍</button><button id="chReset" class="secondary">↺ 重置到第一拍</button></div></section>`;
 document.querySelector('main').append(chordPage);
@@ -87,10 +107,12 @@ TONIC_CHOICES.forEach(([label,pitch])=>$('#chRoots').insertAdjacentHTML('beforee
 POSITIONS.forEach((p,i)=>$('#chPositions').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${i}" ${i===0?'checked':''}><span>P${p.number}</span></label>`));
 CHORD_SCALE_IDS.forEach(id=>$('#chScales').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${id}" ${id==='major'?'checked':''}><span>${SCALES[id].label}</span></label>`));
 CHORD_FAMILIES.forEach(([id,label])=>$('#chTypes').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${id}" ${id==='triads'?'checked':''}><span>${label}</span></label>`));$('#chTypes').className='multi-choice-grid';
-const chValue=id=>$('#ch'+id).value,chChecked=id=>$('#ch'+id).checked;
+TONIC_CHOICES.forEach(([label,pitch])=>$('#chManualRoots').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${pitch}" ${pitch===0?'checked':''}><span>${label}</span></label>`));
+CHORD_GROUPS.forEach(([group,items])=>$('#chManualTypes').insertAdjacentHTML('beforeend',`<details class="multi-select-panel ch-family"><summary>${group}</summary><div class="multi-choice-grid">${items.map(([symbol,label])=>`<label><input type="checkbox" value="${symbol||'major'}" ${['','m','maj7','m7','7'].includes(symbol)?'checked':''}><span>${symbol||'maj'} · ${label}</span></label>`).join('')}</div></details>`));
+const chValue=id=>id==='Source'?checkedValues('#chSources').join(','):$('#ch'+id).value,chChecked=id=>$('#ch'+id).checked;
 const chordSettingsKey='guitar-chord-settings-v1';
-function saveChords(){try{localStorage.setItem(chordSettingsKey,JSON.stringify({scales:checkedValues('#chScales'),roots:checkedValues('#chRoots'),types:checkedValues('#chTypes'),positions:checkedValues('#chPositions'),values:Object.fromEntries(['Mode','Tone','Bpm','Beats','Rhythm'].map(id=>[id,chValue(id)])),checks:Object.fromEntries(['Click','Sound','Answer'].map(id=>[id,chChecked(id)])),open:[...chordPage.querySelectorAll('details')].map(d=>d.open)}))}catch{}}
-try{const s=JSON.parse(localStorage.getItem(chordSettingsKey));if(s){restoreChecks('#chRoots',s.roots);restoreChecks('#chTypes',s.types?.filter(id=>CHORD_FAMILIES.some(f=>f[0]===id)));restoreChecks('#chScales',s.scales);restoreChecks('#chPositions',s.positions);for(const [id,v] of Object.entries(s.values||{})){const el=$('#ch'+id);if(el&&id!=='Beats')el.value=v;}for(const [id,v] of Object.entries(s.checks||{}))$('#ch'+id).checked=v;chordPage.querySelectorAll('details').forEach((d,i)=>d.open=!!s.open?.[i])}}catch{}
+function saveChords(){try{localStorage.setItem(chordSettingsKey,JSON.stringify({manualRoots:checkedValues('#chManualRoots'),manualTypes:checkedValues('#chManualTypes'),scales:checkedValues('#chScales'),roots:checkedValues('#chRoots'),types:checkedValues('#chTypes'),positions:checkedValues('#chPositions'),values:Object.fromEntries(['Source','Mode','Tone','Bpm','Beats','Rhythm'].map(id=>[id,chValue(id)])),checks:Object.fromEntries(['Click','Sound','Answer'].map(id=>[id,chChecked(id)])),open:[...chordPage.querySelectorAll('details')].map(d=>d.open),openById:Object.fromEntries([...chordPage.querySelectorAll('details[id]')].map(d=>[d.id,d.open]))}))}catch{}}
+try{const s=JSON.parse(localStorage.getItem(chordSettingsKey));if(s){restoreChecks('#chManualRoots',s.manualRoots||s.roots);restoreChecks('#chManualTypes',s.manualTypes||s.types?.filter(id=>CHORD_TYPES.some(t=>t.id===id)));restoreChecks('#chRoots',s.roots);restoreChecks('#chTypes',s.types?.filter(id=>CHORD_FAMILIES.some(f=>f[0]===id)));restoreChecks('#chScales',s.scales);restoreChecks('#chPositions',s.positions);for(const [id,v] of Object.entries(s.values||{})){if(id==='Source'){restoreChecks('#chSources',String(v).split(','));continue}const el=$('#ch'+id);if(el&&id!=='Beats')el.value=v;}for(const [id,v] of Object.entries(s.checks||{}))$('#ch'+id).checked=v;chordPage.querySelectorAll('details').forEach((d,i)=>d.open=s.openById?.[d.id]??!!s.open?.[i])}}catch{}
 function chordSpellings(root,type){
   const label=(type.symbol.startsWith('m')&&!type.symbol.startsWith('maj')?MINOR_LABELS[root][0]:MAJOR_LABELS[root][0]);
   const degrees=type.tones.map(t=>t===0?0:t===1||t===2?1:t===3?(type.id==='7#9'?1:2):t===4?2:t===5?3:t===6||t===7||t===8?4:t===9?(type.id==='dim7'?6:5):6);
@@ -127,15 +149,17 @@ function fillChords(){while(ch.queue.length<ch.index+7&&ch.pool.length){
   ch.queue.push({...item,name:(item.rootLabel?item.rootLabel.replaceAll('#','♯').replaceAll('b','♭')+item.type.symbol:chordName(item.root,item.type))});
 }}
 function resetChords(){
-  pauseChords();for(const [id,f] of [['Roots','0'],['Scales','major'],['Types','triads'],['Positions','0']])ensureChecked('#ch'+id,f);
+  pauseChords();for(const [id,f] of [['Roots','0'],['Scales','major'],['Types','triads'],['Positions','0'],['ManualRoots','0'],['ManualTypes','major'],['Sources','diatonic']])ensureChecked('#ch'+id,f);
   $('#chBeats').value='4';if(!['w','h'].includes(chValue('Rhythm')))$('#chRhythm').value='w';
-  ch.pool=[];
-  for(const key of checkedValues('#chRoots').map(Number))for(const scale of checkedValues('#chScales'))for(const family of checkedValues('#chTypes'))
-    for(const item of diatonicChords(key,scale,family))for(const positionIndex of checkedValues('#chPositions').map(Number)){
-      const voicings=chordVoicings(item.root,item.type,positionIndex);if(voicings.length)ch.pool.push({...item,positionIndex,voicings});
-    }
+  const manual=checkedValues('#chSources').includes('manual'),diatonic=checkedValues('#chSources').includes('diatonic');
+  for(const id of ['RootsPanel','ScalesPanel','TypesPanel'])$('#ch'+id).hidden=!diatonic;
+  for(const id of ['ManualRootsPanel','ManualTypesPanel'])$('#ch'+id).hidden=!manual;
+  $('#chManualRootSummary').textContent=`已選 ${checkedValues('#chManualRoots').length} 個根音`;
+  $('#chManualTypeSummary').textContent=`已選 ${checkedValues('#chManualTypes').length} 種`;
+  $('#chSourceHint').textContent=manual&&diatonic?'順階和弦與自選和弦合併出題；自選可超出音階，題目會標示「自選加入」。重複和弦不會重複加權。':manual?'自選根音與個別和弦種類，不受音階限制；僅出收錄的實用指法，省略音會註明，X 弦不彈。':'依調性與音階自動產生順階和弦；同一小節維持同一調性／音階，下一小節可切換。僅出收錄的實用指法，省略音會註明。';
+  ch.pool=buildChordPool({diatonic,manual,keys:checkedValues('#chRoots').map(Number),scales:checkedValues('#chScales'),families:checkedValues('#chTypes'),manualRoots:checkedValues('#chManualRoots').map(Number),manualTypes:checkedValues('#chManualTypes'),positions:checkedValues('#chPositions').map(Number)});
   ch.queue=[];ch.index=0;ch.sub=0;ch.last=0;ch.started=false;fillChords();
-  $('#chAvailability').textContent=ch.pool.length?'':'目前選擇沒有收錄的實用順階指法，請增加把位或和弦類別。';
+  $('#chAvailability').textContent=ch.pool.length?'':'目前選擇沒有收錄的實用指法，請增加把位或和弦類別。';
   $('#chRootSummary').textContent=`已選 ${checkedValues('#chRoots').length} 個調`;
   $('#chScaleSummary').textContent=checkedValues('#chScales').map(id=>SCALES[id].label).join('、');
   $('#chTypeSummary').textContent=checkedValues('#chTypes').map(id=>CHORD_FAMILIES.find(f=>f[0]===id)[1]).join('、');
@@ -149,7 +173,7 @@ function renderChords(){
   $('#chBeat').textContent=`第 ${Math.floor(ch.last/2)+1} 拍 / 4`;
   $('#chDots').innerHTML=Array.from({length:4},(_,i)=>`<i class="beat-dot ${ch.started&&i===Math.floor(ch.last/2)?'active':''}"></i>`).join('');
   $('#chCards').innerHTML=Array.from({length:3},(_,m)=>{
-    const group=shown.slice(m*per,(m+1)*per);return `<section class="ch-measure"><small>${group[0]?.contextLabel||''}</small><div class="ch-measure-chords" style="grid-template-columns:repeat(${per},minmax(0,1fr))">${group.map((q,i)=>`<div class="ch-card"><b>${q.name}</b><small>${q.type.label}</small><div class="position-cue-dom ${m*per+i===current?'current':''}">${cueForChord(q)}</div>${chChecked('Answer')?`<div class="ch-diagram">${chordDiagram(q)}</div><small>${chordOmission(q)}</small>`:''}</div>`).join('')}</div></section>`;
+    const group=shown.slice(m*per,(m+1)*per);return `<section class="ch-measure"><small>${group[0]?.contextLabel||''}</small><div class="ch-measure-chords" style="grid-template-columns:repeat(${per},minmax(0,1fr))">${group.map((q,i)=>`<div class="ch-card"><b>${q.name}</b><small>${q.type.label}${q.manual?' · 自選加入':''}</small><div class="position-cue-dom ${m*per+i===current?'current':''}">${cueForChord(q)}</div>${chChecked('Answer')?`<div class="ch-diagram">${chordDiagram(q)}</div><small>${chordOmission(q)}</small>`:''}</div>`).join('')}</div></section>`;
   }).join('');
   $('#chScore').hidden=!chChecked('Answer');if(chChecked('Answer')&&shown.length)try{renderChordScore(shown,current)}catch(e){$('#chScore').textContent='和弦樂譜載入失敗';console.error(e)}
 }
