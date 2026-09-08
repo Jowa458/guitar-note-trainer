@@ -53,7 +53,7 @@ let beats=4,rhythm='q',events=[];
 const ch={sub:0,started:false,index:0,last:0,queue:Array.from({length:20},()=>({v:{notes:[{midi:48}]}}))};
 const chValue=id=>id==='Beats'?beats:id==='Rhythm'?rhythm:80,chChecked=()=>true;
 const click=accent=>events.push({accent,sub:ch.last,index:ch.index}),stopActiveSounds=()=>events.push('stop');
-const playMidi=()=>{},renderChords=()=>{},fillChords=()=>{},warmChords=async()=>{};
+const playMidi=()=>{},playChordStrum=()=>{},renderChords=()=>{},fillChords=()=>{},warmChords=async()=>{};
 `+source.slice(source.indexOf('function chordTick'),source.indexOf('async function startChords'))+`
 for(rhythm of ['w','h']){
  ch.sub=0;ch.started=false;ch.index=0;events=[];
@@ -67,3 +67,21 @@ for(rhythm of ['w','h']){
 }
 `,timing);
 console.log('4/4: whole/half chord changes, downbeat and resume passed.');
+const strum=vm.createContext({assert});
+vm.runInContext(`
+const state={audio:{currentTime:10}},DURATION_BEATS={w:4,h:2};let calls=[];
+const chValue=id=>id==='Rhythm'?'h':id==='Bpm'?'80':'guitar';
+const playMidi=(...args)=>calls.push(args);
+`+source.slice(source.indexOf('function playChordStrum'),source.indexOf('function chordTick'))+`
+playChordStrum({v:{notes:[5,2,0,4,1,3].map(string=>({string,midi:40+string}))}});
+assert.equal(calls.length,6);calls.forEach((c,i)=>{assert.equal(c[0],40+i);assert(Math.abs(c[4]-(10.004+i*.01))<1e-8)});
+assert(Math.abs(calls[5][4]-calls[0][4]-.05)<1e-8);
+`,strum);
+const cancel=vm.createContext({assert});
+vm.runInContext(`
+let audioEpoch=0;const state={audio:{currentTime:10}},activeAudioVoices=new Set();let stopped;
+activeAudioVoices.add({startTime:10.04,source:{stop:t=>stopped=t},gain:{}});
+`+app.slice(app.indexOf('function stopActiveSounds'),app.indexOf('function click('))+`
+stopActiveSounds();assert.equal(stopped,10);assert.equal(activeAudioVoices.size,0);assert.equal(audioEpoch,1);
+`,cancel);
+console.log('50 ms downstroke and queued-note cancellation passed.');

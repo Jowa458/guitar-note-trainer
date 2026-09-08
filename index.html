@@ -9,6 +9,7 @@
 <body><main class="app">
   <header><p class="eyebrow">GUITAR NOTE TRAINER</p><h1>吉他基礎練習</h1><p>聽著拍子，看譜，立刻彈出來。</p></header>
   <nav class="app-tabs" role="tablist" aria-label="練習種類"><button id="positionTabButton" class="active" role="tab" aria-selected="true" aria-controls="positionPage">把位練習</button><button id="fretboardTabButton" role="tab" aria-selected="false" aria-controls="fretboardPage">指板熟悉練習</button></nav>
+  <section class="settings" aria-label="共用音量"><div class="setting-grid"><label class="range-label">節拍器音量 <output id="metroVolumeValue">70%</output><input id="metroVolume" type="range" min="0" max="100" value="70"></label><label class="range-label">提示音量 <output id="noteVolumeValue">80%</output><input id="noteVolume" type="range" min="0" max="100" value="80"></label></div></section>
   <section id="positionPage" class="tab-page" role="tabpanel" aria-labelledby="positionTabButton">
   <section class="settings" aria-label="練習設定">
     <details id="keyDetails" class="multi-select-panel"><summary>調性（可複選）<span id="keySummary"></span></summary><div id="keyChoices" class="multi-choice-grid tonic-choices"></div><p>顯示時會依大調或小調，自動選擇常用調名與調號。</p></details>
@@ -42,4 +43,4 @@
     </section>
     <p class="hint">每小節兩題：前兩拍依序播放較低、較高位置；後兩拍換下一個音名。若只有一個位置，會播放同一音高兩次。</p>
   </section>
-</main><link rel="stylesheet" href="chords.css?v=2" /><script src="vendor/vexflow.js?v=5.0.0"></script><script src="app.js?v=80"></script><script src="chords.js?v=3"></script></body></html>
+</main><link rel="stylesheet" href="chords.css?v=2" /><script src="vendor/vexflow.js?v=5.0.0"></script><script src="app.js?v=81"></script><script src="chords.js?v=4"></script></body></html>
