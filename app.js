@@ -41,7 +41,12 @@ let savedActiveTab='position';
 const initialPracticeTab=(()=>{try{return JSON.parse(localStorage.getItem(SETTINGS_KEY))?.activeTab}catch{return 'position'}})();
 let positionStartToken=0,fretboardStartToken=0;
 
-POSITIONS.forEach((position,index)=>$('#positionChoices').insertAdjacentHTML('beforeend',`<label class="position-choice"><input type="checkbox" value="${index}" ${index===0?'checked':''}><span>P${position.number}</span></label>`));
+function positionChoiceIcon(position){
+  const rootX=12+(6-position.rootString)*10;
+  const arrow=position.direction==='up'?'M37 37 V16 M32 22 L37 16 L42 22':'M37 43 V64 M32 58 L37 64 L42 58';
+  return `<svg class="choice-position-icon" viewBox="0 0 74 73" aria-hidden="true"><g class="mini-grid">${[0,1,2,3,4,5].map(i=>`<path d="M${12+i*10} 9 V62"/>`).join('')}${[9,20,31,42,53,62].map(y=>`<path d="M8 ${y} H66"/>`).join('')}</g><path class="mini-arrow" d="${arrow}"/><circle class="mini-root" cx="${rootX}" cy="36" r="4.8"/><text class="choice-root-string" x="${rootX}" y="71">${position.rootString}</text></svg>`;
+}
+POSITIONS.forEach((position,index)=>$('#positionChoices').insertAdjacentHTML('beforeend',`<label class="position-choice"><input type="checkbox" value="${index}" ${index===0?'checked':''}><span><b>Position ${position.number}</b><small>${position.shape}</small>${positionChoiceIcon(position)}</span></label>`));
 TONIC_CHOICES.forEach(([label,pitch])=>$('#keyChoices').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${pitch}" ${pitch===9?'checked':''}><span>${label}</span></label>`));
 Object.entries(SCALES).forEach(([id,scale])=>$('#scaleChoices').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${id}" ${id==='major'?'checked':''}><span>${scale.label}</span></label>`));
 

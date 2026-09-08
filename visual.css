@@ -11,6 +11,16 @@ header p:not(.eyebrow) { color:#cbd4cd; font-size:.96rem; line-height:1.65; lett
 .score-panel > p { margin:0 0 6px; color:var(--muted); font-size:.72rem; text-align:left; }
 .position-strip { display:none; }
 .position-strip span { display:flex; flex-direction:column; gap:2px; min-width:0; padding:6px 8px; border-left:3px solid #d62f2f; border-radius:3px; background:#f2eedf; }
+#positionChoices { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; }
+#positionChoices .position-choice span { display:grid; min-height:118px; padding:7px 3px 4px; place-items:center; gap:1px; }
+#positionChoices .position-choice b { color:inherit; font-size:.72rem; line-height:1.1; }
+#positionChoices .position-choice small { color:inherit; font-size:.62rem; line-height:1.1; }
+.choice-position-icon { display:block; width:58px; height:62px; }
+.choice-position-icon .mini-grid { fill:none; stroke:#536159; stroke-width:1; }
+.choice-position-icon .mini-arrow { fill:none; stroke:#5d6962; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+.choice-position-icon .mini-root { fill:#e62f35; stroke:#fff4f0; stroke-width:1.5; }
+.choice-position-icon .choice-root-string { fill:#e62f35; font:900 8px Arial,sans-serif; text-anchor:middle; }
+#positionChoices .position-choice input:checked+span .mini-grid,#positionChoices .position-choice input:checked+span .mini-arrow { stroke:var(--deep); }
 .position-strip small { font-size:.62rem; color:#687269; }
 .position-strip b { overflow:hidden; font:700 .82rem/1.2 Arial,sans-serif; white-space:nowrap; text-overflow:ellipsis; }
 .position-strip i { min-width:0; }.position-strip span.current { color:#fff; border-color:#ff6b5f; background:#d62f2f; box-shadow:0 0 0 2px rgba(214,47,47,.2); }.position-strip span.current small { color:#ffe1dd; }
