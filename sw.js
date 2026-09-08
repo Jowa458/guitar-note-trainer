@@ -1,6 +1,6 @@
-const CACHE = 'guitar-practice-v82';
+const CACHE = 'guitar-practice-v83';
 const SAMPLE_CACHE = 'guitar-samples-v1';
-const ASSETS = ['./', './index.html', './styles.css', './override.css', './visual.css', './visual.css?v=8', './vendor/vexflow.js', './vendor/vexflow.js?v=5.0.0', './app.js', './app.js?v=79', './chords.js?v=1', './chords.css?v=1', './manifest.webmanifest', './icons/icon.svg'];
+const ASSETS = ['./', './index.html', './styles.css', './override.css', './visual.css', './visual.css?v=8', './vendor/vexflow.js', './vendor/vexflow.js?v=5.0.0', './app.js', './app.js?v=80', './chords.js?v=2', './chords.css?v=2', './manifest.webmanifest', './icons/icon.svg'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('guitar-practice-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch', event => {

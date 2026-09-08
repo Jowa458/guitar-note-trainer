@@ -5,6 +5,11 @@
 .ch-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); background:#fbf7e9; color:#18251f; border-radius:8px 8px 0 0; padding:16px 4px 0; }
 .ch-card { display:grid; justify-items:center; align-content:start; gap:5px; min-width:0; text-align:center; }
 .ch-card b { font-size:clamp(18px,2.4vw,30px); }
+.ch-measure { min-width:0; text-align:center; border-right:1px solid #d5d1c5; }
+.ch-measure>small { display:block; margin:0 3px 12px; font-size:13px; }
+.ch-measure-chords { display:grid; }
+.ch-measure .ch-diagram { width:min(100%,110px); }
+.ch-measure .ch-card b { font-size:clamp(13px,2vw,26px); }
 .ch-card small { font-size:12px; line-height:1.5; min-height:18px; }
 .ch-diagram { width:clamp(85px,12vw,125px); }
 .ch-diagram svg { display:block; width:100%; }

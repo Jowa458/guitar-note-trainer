@@ -6,7 +6,7 @@ vm.runInContext(app.slice(0,app.indexOf('const notationMode='))+
   app.slice(app.indexOf('function choosePositionIndex'),app.indexOf('function musicalLocation'))+
   source.slice(0,source.indexOf('const chordPage='))+
   source.slice(source.indexOf('function chordSpellings'),source.indexOf('function resetChords'))+`
-  let mode='musical';const chValue=()=>mode,generatorMode={value:'musical'};
+  let mode='musical',rhythm='w';const chValue=id=>id==='Rhythm'?rhythm:mode,generatorMode={value:'musical'};
   const ch={queue:[],index:0,pool:[]};
   let voicings=0;
   for(let root=0;root<12;root++)for(const type of CHORD_TYPES)for(let p=0;p<5;p++){
@@ -27,7 +27,17 @@ vm.runInContext(app.slice(0,app.indexOf('const notationMode='))+
   assert(musical.stays<.35);assert(musical.far>0);assert(musical.distance<random.distance);
   // Remaining in place becomes less likely, but is never forbidden.
   const q=ch.queue[0];assert(chordMoveWeight(q,q,[q,q,q])<chordMoveWeight(q,q,[q]));
-  console.log(JSON.stringify({voicings,musical,random},null,2));
+  assert.deepEqual(diatonicChords(0,'major','triads').map(q=>q.rootLabel+q.type.symbol),['C','Dm','Em','F','G','Am','Bdim']);
+  assert.deepEqual(diatonicChords(0,'major','sevenths').map(q=>q.rootLabel+q.type.symbol),['Cmaj7','Dm7','Em7','Fmaj7','G7','Am7','Bm7b5']);
+  assert.deepEqual(diatonicChords(9,'minor','triads').map(q=>q.rootLabel+q.type.symbol),['Am','Bdim','C','Dm','Em','F','G']);
+  assert(diatonicChords(6,'major','triads').some(q=>q.rootLabel==='E#'&&q.type.id==='dim'));
+  assert(diatonicChords(6,'major','triads').some(q=>q.rootLabel==='Cb'&&q.type.id==='major'));
+  for(let key=0;key<12;key++)for(const scale of CHORD_SCALE_IDS)for(const [family] of CHORD_FAMILIES)
+    for(const q of diatonicChords(key,scale,family))assert(q.type.tones.every(t=>SCALES[scale].intervals.includes((q.root+t-key+12)%12)));
+  ch.pool=[0,7].flatMap(key=>diatonicChords(key,'major','triads').flatMap(q=>{const vs=chordVoicings(q.root,q.type,0);return vs.length?[{...q,positionIndex:0,voicings:vs}]:[]}));
+  rhythm='h';ch.queue=[];ch.index=50;fillChords();
+  for(let i=0;i+1<ch.queue.length;i+=2)assert.equal(ch.queue[i].contextId,ch.queue[i+1].contextId);
+  console.log(JSON.stringify({voicings,musical,random,diatonic:'passed'},null,2));
 `,ctx);
 const timing=vm.createContext({assert});
 vm.runInContext(`
@@ -38,14 +48,15 @@ const chValue=id=>id==='Beats'?beats:id==='Rhythm'?rhythm:80,chChecked=()=>true;
 const click=accent=>events.push({accent,sub:ch.last,index:ch.index}),stopActiveSounds=()=>events.push('stop');
 const playMidi=()=>{},renderChords=()=>{},fillChords=()=>{},warmChords=async()=>{};
 `+source.slice(source.indexOf('function chordTick'),source.indexOf('async function startChords'))+`
-for(beats=2;beats<=6;beats++)for(rhythm of ['q','8']){
+for(rhythm of ['w','h']){
  ch.sub=0;ch.started=false;ch.index=0;events=[];
  for(let i=0;i<beats*6;i++)chordTick();
  const clicks=events.filter(e=>typeof e==='object');assert.equal(clicks.length,beats*3);
  clicks.forEach((e,i)=>assert.equal(e.accent,i%beats===0));
  assert(clicks.every(e=>e.accent?e.sub===0:e.sub!==0));
+ clicks.forEach((e,i)=>assert.equal(e.index,Math.floor(i/DURATION_BEATS[rhythm])));
  // Stopping between ticks leaves the next subdivision unchanged on resume.
  const next=ch.sub;chordTick();assert.equal(ch.last,next);
 }
 `,timing);
-console.log('All meters: downbeat, subdivision, and resume sequence passed.');
+console.log('4/4: whole/half chord changes, downbeat and resume passed.');

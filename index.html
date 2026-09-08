@@ -18,7 +18,7 @@
     <fieldset class="sound-options"><legend>聲音</legend><label><input id="metronomeSound" type="checkbox" checked /> 節拍器聲音</label><label><input id="pitchSound" type="checkbox" /> 音高提示音</label></fieldset>
     <fieldset><legend>練習把位（可複選）</legend><div id="positionChoices"></div></fieldset>
     <label class="range-label">速度 <output id="bpmValue">80</output> BPM<input id="bpm" type="range" min="40" max="180" value="80" /></label>
-    <div class="setting-grid"><label>一小節<select id="beats"><option value="2">2 拍</option><option value="3">3 拍</option><option value="4" selected>4 拍</option><option value="5">5 拍</option><option value="6">6 拍</option></select></label><label>音符時值<select id="rhythm"><option value="w">全音符</option><option value="h">二分音符</option><option value="q" selected>四分音符</option><option value="8">八分音符</option></select></label></div>
+    <input id="beats" type="hidden" value="4"><div class="setting-grid"><span>固定 4/4 拍</span><label>音符時值<select id="rhythm"><option value="w">全音符</option><option value="h">二分音符</option><option value="q" selected>四分音符</option><option value="8">八分音符</option></select></label></div>
     <input id="changeMode" type="hidden" value="beat" /><input id="notesPerPosition" type="hidden" value="4" /><output id="notesPerPositionValue" hidden>4</output>
   </section>
   <section class="practice" aria-live="polite">
@@ -42,4 +42,4 @@
     </section>
     <p class="hint">每小節兩題：前兩拍依序播放較低、較高位置；後兩拍換下一個音名。若只有一個位置，會播放同一音高兩次。</p>
   </section>
-</main><link rel="stylesheet" href="chords.css?v=1" /><script src="vendor/vexflow.js?v=5.0.0"></script><script src="app.js?v=79"></script><script src="chords.js?v=1"></script></body></html>
+</main><link rel="stylesheet" href="chords.css?v=2" /><script src="vendor/vexflow.js?v=5.0.0"></script><script src="app.js?v=80"></script><script src="chords.js?v=2"></script></body></html>
