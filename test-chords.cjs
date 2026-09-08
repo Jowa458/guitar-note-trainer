@@ -51,6 +51,9 @@ vm.runInContext(source.slice(source.indexOf('function chordSignature'),source.in
   assert.equal(chordSignature({contextId:'F♯:major'}).count,6);
   assert.equal(chordSignature({contextId:'G♭:major'}).count,-6);
   assert.equal(chordSignature({contextId:'manual'}).count,0);
+  const manualD=buildChordPool({...settings,diatonic:false,keys:[2]});
+  assert(manualD.length>0);
+  assert(manualD.every(q=>q.contextId==='D:major'&&chordSignature(q).count===2));
   const localAccidentals=new Map(),minorSignature=chordSignature({contextId:'C:minor'});
   assert.equal(chordAccidental('Eb/4',localAccidentals,minorSignature),'');
   assert.equal(chordAccidental('E/4',localAccidentals,minorSignature),'n');

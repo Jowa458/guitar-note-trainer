@@ -73,7 +73,9 @@ function buildChordPool(options){
     for(const item of diatonicChords(key,scale,family))for(const positionIndex of positions){
       const voicings=chordVoicings(item.root,item.type,positionIndex);if(voicings.length)pool.push({...item,positionIndex,voicings});
     }
-  const contexts=[...new Map(pool.map(q=>[q.contextId,{contextId:q.contextId,contextLabel:q.contextLabel}])).values()];
+  const contexts=keys.flatMap(pitch=>scales.flatMap(scaleId=>{
+    const scale=SCALES[scaleId];return (scale.minor?MINOR_LABELS[pitch]:MAJOR_LABELS[pitch]).map(label=>({contextId:label+':'+scaleId,contextLabel:label+' · '+scale.label}));
+  }));
   if(!contexts.length)contexts.push({contextId:'manual',contextLabel:'自選和弦'});
   if(manual)for(const root of manualRoots)for(const id of manualTypes){
     const type=CHORD_TYPES.find(t=>t.id===id);if(!type)continue;
@@ -93,7 +95,7 @@ chordPage.innerHTML=`<section class="settings" aria-label="和弦練習設定">
   <details class="multi-select-panel" id="chRootsPanel"><summary>調性（可複選）<span id="chRootSummary"></span></summary><div class="multi-choice-grid" id="chRoots"></div></details>
   <details class="multi-select-panel" id="chScalesPanel"><summary>音階（可複選）<span id="chScaleSummary"></span></summary><div class="multi-choice-grid" id="chScales"></div></details>\n  <details class="multi-select-panel" id="chTypesPanel"><summary>順階和弦類別（可複選）<span id="chTypeSummary"></span></summary><div id="chTypes"></div></details>
   <label>記譜方式<select id="chNotation"><option value="signature">使用調號</option><option value="accidentals">不用調號，全部用臨時升降記號</option></select></label>
-  <p class="hint" id="chNotationHint" hidden>純自選和弦沒有固定調性，使用臨時升降記號。</p>
+  <p class="hint" id="chNotationHint" hidden></p>
   <fieldset><legend>把位（可複選）</legend><div class="multi-choice-grid" id="chPositions"></div></fieldset>
   <div class="setting-grid"><label>出題方式<select id="chMode"><option value="musical">順暢換把（加權）</option><option value="random">純隨機</option></select></label><label>提示音色<select id="chTone"><option value="guitar">吉他</option><option value="eguitar">電吉他</option></select></label></div>
   <label class="range-label">速度 <output id="chBpmValue">80</output> BPM<input id="chBpm" type="range" min="40" max="180" value="80"></label>
@@ -155,7 +157,8 @@ function resetChords(){
   if(!['signature','accidentals'].includes(chValue('Notation')))$('#chNotation').value='signature';
   $('#chBeats').value='4';if(!['w','h'].includes(chValue('Rhythm')))$('#chRhythm').value='w';
   const manual=checkedValues('#chSources').includes('manual'),diatonic=checkedValues('#chSources').includes('diatonic');
-  for(const id of ['RootsPanel','ScalesPanel','TypesPanel'])$('#ch'+id).hidden=!diatonic;
+  for(const id of ['RootsPanel','ScalesPanel'])$('#ch'+id).hidden=false;
+  $('#chTypesPanel').hidden=!diatonic;
   for(const id of ['ManualRootsPanel','ManualTypesPanel'])$('#ch'+id).hidden=!manual;
   $('#chManualRootSummary').textContent=`已選 ${checkedValues('#chManualRoots').length} 個根音`;
   $('#chManualTypeSummary').textContent=`已選 ${checkedValues('#chManualTypes').length} 種`;
@@ -171,8 +174,11 @@ function resetChords(){
 function chordDiagram(q){const v=q.v,p=POSITIONS[q.positionIndex],min=Math.max(1,Math.min(...v.notes.map(n=>n.fret).filter(f=>f>0))),rows=Math.max(4,v.high-min+1),step=64/rows,x=s=>20+s*14;return `<svg viewBox="0 0 110 110" role="img" aria-label="${q.name} 指法 ${v.frets.map(f=>f<0?'X':f).join(' ')}"><g stroke="currentColor" fill="none">${[0,1,2,3,4,5].map(s=>`<path d="M${x(s)} 25 V89"/>`).join('')}${Array.from({length:rows+1},(_,i)=>25+i*step).map(y=>`<path d="M20 ${y} H90"/>`).join('')}</g><text x="2" y="39" font-size="10">${min}</text>${v.frets.map((f,s)=>f<0||f===0?`<text x="${x(s)}" y="18" text-anchor="middle" font-size="12">${f<0?'×':'○'}</text>`:`<circle cx="${x(s)}" cy="${25+step*(f-min+.5)}" r="5" fill="${(OPEN_MIDI[s]+f)%12===q.root?'#e62f35':'currentColor'}"/>`).join('')}${[6,5,4,3,2,1].map((n,s)=>`<text x="${x(s)}" y="104" text-anchor="middle" font-size="10" fill="${n===p.rootString?'#e62f35':'currentColor'}">${n}</text>`).join('')}</svg>`}
 function cueForChord(q){const p=POSITIONS[q.positionIndex];return `<svg viewBox="0 0 74 84" class="mini-position-tab" aria-label="P${p.number} ${p.rootString} 弦 ${p.direction==='up'?'向上':'向下'}"><g class="mini-grid">${[0,1,2,3,4,5].map(i=>`<path d="M${12+i*10} 13 V69"/>`).join('')}${[13,27,41,55,69].map(y=>`<path d="M8 ${y} H66"/>`).join('')}</g><path class="mini-arrow" d="${p.direction==='up'?'M37 36 V15 M32 21 L37 15 L42 21':'M37 46 V67 M32 61 L37 67 L42 61'}"/><circle class="mini-root" cx="${12+(6-p.rootString)*10}" cy="41" r="5.5"/>${[6,5,4,3,2,1].map((n,i)=>`<text class="${n===p.rootString?'root-string-number':''}" x="${12+i*10}" y="80">${n}</text>`).join('')}</svg>`}
 function renderChords(){
-  $('#chNotationHint').hidden=chValue('Notation')!=='signature'||ch.pool.some(q=>q.contextId!=='manual');
   const per=chordsPerMeasure(),page=Math.floor(ch.index/(2*per))*2*per,shown=ch.queue.slice(page,page+3*per),current=ch.index-page;
+  const hint=$('#chNotationHint'),onlyManual=!checkedValues('#chSources').includes('diatonic');
+  const noAlterations=shown.length&&shown.every(q=>chordSignature(q).count===0);
+  hint.hidden=chValue('Notation')!=='signature'||(!onlyManual&&!noAlterations);
+  hint.textContent=(onlyManual?'自選和弦使用上方所選調性記譜，調外音會加臨時記號。':'')+(noAlterations?'目前顯示的 C 大調／A 自然小調本來沒有升降調號。':'');
   $('#chScore').innerHTML='';$('#chCurrent').textContent=ch.queue[ch.index]?.name||'請選擇其他和弦或把位';
   $('#chBeat').textContent=`第 ${Math.floor(ch.last/2)+1} 拍 / 4`;
   $('#chDots').innerHTML=Array.from({length:4},(_,i)=>`<i class="beat-dot ${ch.started&&i===Math.floor(ch.last/2)?'active':''}"></i>`).join('');
