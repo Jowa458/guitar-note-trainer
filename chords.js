@@ -92,6 +92,8 @@ chordPage.innerHTML=`<section class="settings" aria-label="和弦練習設定">
   <details class="multi-select-panel" id="chManualTypesPanel"><summary>自選和弦種類（分類複選）<span id="chManualTypeSummary"></span></summary><div id="chManualTypes"></div></details>
   <details class="multi-select-panel" id="chRootsPanel"><summary>調性（可複選）<span id="chRootSummary"></span></summary><div class="multi-choice-grid" id="chRoots"></div></details>
   <details class="multi-select-panel" id="chScalesPanel"><summary>音階（可複選）<span id="chScaleSummary"></span></summary><div class="multi-choice-grid" id="chScales"></div></details>\n  <details class="multi-select-panel" id="chTypesPanel"><summary>順階和弦類別（可複選）<span id="chTypeSummary"></span></summary><div id="chTypes"></div></details>
+  <label>記譜方式<select id="chNotation"><option value="signature">使用調號</option><option value="accidentals">不用調號，全部用臨時升降記號</option></select></label>
+  <p class="hint" id="chNotationHint" hidden>純自選和弦沒有固定調性，使用臨時升降記號。</p>
   <fieldset><legend>把位（可複選）</legend><div class="multi-choice-grid" id="chPositions"></div></fieldset>
   <div class="setting-grid"><label>出題方式<select id="chMode"><option value="musical">順暢換把（加權）</option><option value="random">純隨機</option></select></label><label>提示音色<select id="chTone"><option value="guitar">吉他</option><option value="eguitar">電吉他</option></select></label></div>
   <label class="range-label">速度 <output id="chBpmValue">80</output> BPM<input id="chBpm" type="range" min="40" max="180" value="80"></label>
@@ -111,7 +113,7 @@ TONIC_CHOICES.forEach(([label,pitch])=>$('#chManualRoots').insertAdjacentHTML('b
 CHORD_GROUPS.forEach(([group,items])=>$('#chManualTypes').insertAdjacentHTML('beforeend',`<details class="multi-select-panel ch-family"><summary>${group}</summary><div class="multi-choice-grid">${items.map(([symbol,label])=>`<label><input type="checkbox" value="${symbol||'major'}" ${['','m','maj7','m7','7'].includes(symbol)?'checked':''}><span>${symbol||'maj'} · ${label}</span></label>`).join('')}</div></details>`));
 const chValue=id=>id==='Source'?checkedValues('#chSources').join(','):$('#ch'+id).value,chChecked=id=>$('#ch'+id).checked;
 const chordSettingsKey='guitar-chord-settings-v1';
-function saveChords(){try{localStorage.setItem(chordSettingsKey,JSON.stringify({manualRoots:checkedValues('#chManualRoots'),manualTypes:checkedValues('#chManualTypes'),scales:checkedValues('#chScales'),roots:checkedValues('#chRoots'),types:checkedValues('#chTypes'),positions:checkedValues('#chPositions'),values:Object.fromEntries(['Source','Mode','Tone','Bpm','Beats','Rhythm'].map(id=>[id,chValue(id)])),checks:Object.fromEntries(['Click','Sound','Answer'].map(id=>[id,chChecked(id)])),open:[...chordPage.querySelectorAll('details')].map(d=>d.open),openById:Object.fromEntries([...chordPage.querySelectorAll('details[id]')].map(d=>[d.id,d.open]))}))}catch{}}
+function saveChords(){try{localStorage.setItem(chordSettingsKey,JSON.stringify({manualRoots:checkedValues('#chManualRoots'),manualTypes:checkedValues('#chManualTypes'),scales:checkedValues('#chScales'),roots:checkedValues('#chRoots'),types:checkedValues('#chTypes'),positions:checkedValues('#chPositions'),values:Object.fromEntries(['Source','Notation','Mode','Tone','Bpm','Beats','Rhythm'].map(id=>[id,chValue(id)])),checks:Object.fromEntries(['Click','Sound','Answer'].map(id=>[id,chChecked(id)])),open:[...chordPage.querySelectorAll('details')].map(d=>d.open),openById:Object.fromEntries([...chordPage.querySelectorAll('details[id]')].map(d=>[d.id,d.open]))}))}catch{}}
 try{const s=JSON.parse(localStorage.getItem(chordSettingsKey));if(s){restoreChecks('#chManualRoots',s.manualRoots||s.roots);restoreChecks('#chManualTypes',s.manualTypes||s.types?.filter(id=>CHORD_TYPES.some(t=>t.id===id)));restoreChecks('#chRoots',s.roots);restoreChecks('#chTypes',s.types?.filter(id=>CHORD_FAMILIES.some(f=>f[0]===id)));restoreChecks('#chScales',s.scales);restoreChecks('#chPositions',s.positions);for(const [id,v] of Object.entries(s.values||{})){if(id==='Source'){restoreChecks('#chSources',String(v).split(','));continue}const el=$('#ch'+id);if(el&&id!=='Beats')el.value=v;}for(const [id,v] of Object.entries(s.checks||{}))$('#ch'+id).checked=v;chordPage.querySelectorAll('details').forEach((d,i)=>d.open=s.openById?.[d.id]??!!s.open?.[i])}}catch{}
 function chordSpellings(root,type){
   const label=(type.symbol.startsWith('m')&&!type.symbol.startsWith('maj')?MINOR_LABELS[root][0]:MAJOR_LABELS[root][0]);
@@ -150,6 +152,7 @@ function fillChords(){while(ch.queue.length<ch.index+7&&ch.pool.length){
 }}
 function resetChords(){
   pauseChords();for(const [id,f] of [['Roots','0'],['Scales','major'],['Types','triads'],['Positions','0'],['ManualRoots','0'],['ManualTypes','major'],['Sources','diatonic']])ensureChecked('#ch'+id,f);
+  if(!['signature','accidentals'].includes(chValue('Notation')))$('#chNotation').value='signature';
   $('#chBeats').value='4';if(!['w','h'].includes(chValue('Rhythm')))$('#chRhythm').value='w';
   const manual=checkedValues('#chSources').includes('manual'),diatonic=checkedValues('#chSources').includes('diatonic');
   for(const id of ['RootsPanel','ScalesPanel','TypesPanel'])$('#ch'+id).hidden=!diatonic;
@@ -168,6 +171,7 @@ function resetChords(){
 function chordDiagram(q){const v=q.v,p=POSITIONS[q.positionIndex],min=Math.max(1,Math.min(...v.notes.map(n=>n.fret).filter(f=>f>0))),rows=Math.max(4,v.high-min+1),step=64/rows,x=s=>20+s*14;return `<svg viewBox="0 0 110 110" role="img" aria-label="${q.name} 指法 ${v.frets.map(f=>f<0?'X':f).join(' ')}"><g stroke="currentColor" fill="none">${[0,1,2,3,4,5].map(s=>`<path d="M${x(s)} 25 V89"/>`).join('')}${Array.from({length:rows+1},(_,i)=>25+i*step).map(y=>`<path d="M20 ${y} H90"/>`).join('')}</g><text x="2" y="39" font-size="10">${min}</text>${v.frets.map((f,s)=>f<0||f===0?`<text x="${x(s)}" y="18" text-anchor="middle" font-size="12">${f<0?'×':'○'}</text>`:`<circle cx="${x(s)}" cy="${25+step*(f-min+.5)}" r="5" fill="${(OPEN_MIDI[s]+f)%12===q.root?'#e62f35':'currentColor'}"/>`).join('')}${[6,5,4,3,2,1].map((n,s)=>`<text x="${x(s)}" y="104" text-anchor="middle" font-size="10" fill="${n===p.rootString?'#e62f35':'currentColor'}">${n}</text>`).join('')}</svg>`}
 function cueForChord(q){const p=POSITIONS[q.positionIndex];return `<svg viewBox="0 0 74 84" class="mini-position-tab" aria-label="P${p.number} ${p.rootString} 弦 ${p.direction==='up'?'向上':'向下'}"><g class="mini-grid">${[0,1,2,3,4,5].map(i=>`<path d="M${12+i*10} 13 V69"/>`).join('')}${[13,27,41,55,69].map(y=>`<path d="M8 ${y} H66"/>`).join('')}</g><path class="mini-arrow" d="${p.direction==='up'?'M37 36 V15 M32 21 L37 15 L42 21':'M37 46 V67 M32 61 L37 67 L42 61'}"/><circle class="mini-root" cx="${12+(6-p.rootString)*10}" cy="41" r="5.5"/>${[6,5,4,3,2,1].map((n,i)=>`<text class="${n===p.rootString?'root-string-number':''}" x="${12+i*10}" y="80">${n}</text>`).join('')}</svg>`}
 function renderChords(){
+  $('#chNotationHint').hidden=chValue('Notation')!=='signature'||ch.pool.some(q=>q.contextId!=='manual');
   const per=chordsPerMeasure(),page=Math.floor(ch.index/(2*per))*2*per,shown=ch.queue.slice(page,page+3*per),current=ch.index-page;
   $('#chScore').innerHTML='';$('#chCurrent').textContent=ch.queue[ch.index]?.name||'請選擇其他和弦或把位';
   $('#chBeat').textContent=`第 ${Math.floor(ch.last/2)+1} 拍 / 4`;
@@ -177,7 +181,54 @@ function renderChords(){
   }).join('');
   $('#chScore').hidden=!chChecked('Answer');if(chChecked('Answer')&&shown.length)try{renderChordScore(shown,current)}catch(e){$('#chScore').textContent='和弦樂譜載入失敗';console.error(e)}
 }
-function renderChordScore(shown,current){const VF=window.VexFlow,target=$('#chScore');target.innerHTML='';const duration=chValue('Rhythm'),per=+chValue('Beats')/DURATION_BEATS[duration],width=Math.max(440,per*100),header=110,total=header+3*width+10,renderer=new VF.Renderer(target,VF.Renderer.Backends.SVG);renderer.resize(total,410);$('#chCards').style.paddingLeft=`${100*header/total}%`;const ctx=renderer.getContext();new VF.Stave(0,70,header).setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).addClef('treble','default','8vb').addTimeSignature(chValue('Beats')+'/4').setContext(ctx).draw();new VF.TabStave(0,255,header).setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).setContext(ctx).draw();Array.from({length:3},(_,m)=>{const staff=new VF.Stave(header+m*width,70,width).setBegBarType(VF.Barline.type.NONE).setContext(ctx),tab=new VF.TabStave(header+m*width,255,width).setBegBarType(VF.Barline.type.NONE).setContext(ctx);staff.draw();tab.draw();const ns=[],ts=[],accidentals=new Map();for(let i=0;i<per;i++){const q=shown[m*per+i];const keys=q.v.notes.slice().sort((a,b)=>a.midi-b.midi).map(n=>chordNotationKey(q,n)),sn=new VF.StaveNote({clef:'treble',keys,duration,autoStem:true}),tn=new VF.TabNote({positions:q.v.notes.map(n=>({str:6-n.string,fret:n.fret})),duration});keys.forEach((key,j)=>{const accidental=key.split('/')[0].slice(1);const identity=key[0]+key.split('/')[1],previous=accidentals.get(identity)||'';if(accidental!==previous)sn.addModifier(new VF.Accidental(accidental||'n'),j);accidentals.set(identity,accidental)});if(m*per+i===current){sn.setStyle({fillStyle:'#d62f2f',strokeStyle:'#d62f2f'});tn.setStyle({fillStyle:'#d62f2f',strokeStyle:'#d62f2f'})}ns.push(sn);ts.push(tn)}const voice=new VF.Voice({numBeats:+chValue('Beats'),beatValue:4}).addTickables(ns),tv=new VF.Voice({numBeats:+chValue('Beats'),beatValue:4}).addTickables(ts),beams=duration==='8'?VF.Beam.generateBeams(ns,{groups:[new VF.Fraction(1,4)]}):[];new VF.Formatter().joinVoices([voice]).joinVoices([tv]).format([voice,tv],width-65);voice.draw(ctx,staff);tv.draw(ctx,tab);beams.forEach(b=>b.setContext(ctx).draw())});const svg=target.querySelector('svg');svg.setAttribute('viewBox',`0 0 ${total} 410`);svg.style.width='100%';svg.style.height='auto'}
+function chordSignature(question){
+  const [label,scaleId]=(question?.contextId||'manual').split(':');
+  const family=scaleId==='minor'?'minor':'major',count=SIGNATURE_COUNTS[family][label];
+  if(count==null)return {name:'C',count:0};
+  return {name:label.replace('♯','#').replace('♭','b')+(family==='minor'?'m':''),count};
+}
+function chordAccidental(key,accidentals,signature){
+  const [note,octave]=key.split('/'),letter=note[0],desired=note.slice(1),identity=letter+octave;
+  const order=signature.count>0?'FCGDAEB':'BEADGCF';
+  const inherited=order.slice(0,Math.abs(signature.count)).includes(letter)?(signature.count>0?'#':'b'):'';
+  const previous=accidentals.has(identity)?accidentals.get(identity):inherited;
+  accidentals.set(identity,desired);
+  return desired===previous?'':desired||'n';
+}
+function renderChordScore(shown,current){
+  const VF=window.VexFlow,target=$('#chScore');target.innerHTML='';
+  const duration=chValue('Rhythm'),per=chordsPerMeasure(),useSignature=chValue('Notation')==='signature';
+  const signatures=Array.from({length:3},(_,m)=>useSignature?chordSignature(shown[m*per]):{name:'C',count:0});
+  const width=440,header=120+Math.abs(signatures[0].count)*12,total=header+3*width+10;
+  const renderer=new VF.Renderer(target,VF.Renderer.Backends.SVG);renderer.resize(total,410);
+  $('#chCards').style.paddingLeft=`${100*header/total}%`;
+  const ctx=renderer.getContext(),head=new VF.Stave(0,70,header).setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).addClef('treble','default','8vb');
+  if(useSignature)head.addKeySignature(signatures[0].name);
+  head.addTimeSignature('4/4').setContext(ctx).draw();
+  new VF.TabStave(0,255,header).setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).setContext(ctx).draw();
+  for(let m=0;m<3;m++){
+    const staff=new VF.Stave(header+m*width,70,width).setBegBarType(VF.Barline.type.NONE).setContext(ctx);
+    const tab=new VF.TabStave(header+m*width,255,width).setBegBarType(VF.Barline.type.NONE).setContext(ctx);
+    if(useSignature&&m>0&&signatures[m].name!==signatures[m-1].name)staff.addKeySignature(signatures[m].name,signatures[m-1].name);
+    staff.draw();
+    // The signature uses staff space; reserve the same space in TAB.
+    tab.setNoteStartX(staff.getNoteStartX());tab.draw();
+    const ns=[],ts=[],accidentals=new Map();
+    for(let i=0;i<per;i++){
+      const q=shown[m*per+i],keys=q.v.notes.slice().sort((a,b)=>a.midi-b.midi).map(n=>chordNotationKey(q,n));
+      const sn=new VF.StaveNote({clef:'treble',keys,duration,autoStem:true});
+      const tn=new VF.TabNote({positions:q.v.notes.map(n=>({str:6-n.string,fret:n.fret})),duration});
+      keys.forEach((key,j)=>{const accidental=chordAccidental(key,accidentals,signatures[m]);if(accidental)sn.addModifier(new VF.Accidental(accidental),j)});
+      if(m*per+i===current){sn.setStyle({fillStyle:'#d62f2f',strokeStyle:'#d62f2f'});tn.setStyle({fillStyle:'#d62f2f',strokeStyle:'#d62f2f'})}
+      ns.push(sn);ts.push(tn);
+    }
+    const voice=new VF.Voice({numBeats:4,beatValue:4}).addTickables(ns),tv=new VF.Voice({numBeats:4,beatValue:4}).addTickables(ts);
+    const usable=Math.min(staff.getNoteEndX()-staff.getNoteStartX(),tab.getNoteEndX()-tab.getNoteStartX())-35;
+    new VF.Formatter().joinVoices([voice]).joinVoices([tv]).format([voice,tv],usable);
+    voice.draw(ctx,staff);tv.draw(ctx,tab);
+  }
+  const svg=target.querySelector('svg');svg.setAttribute('viewBox',`0 0 ${total} 410`);svg.style.width='100%';svg.style.height='auto';
+}
 async function warmChords(){if(chChecked('Sound'))await preloadSamples(ch.queue.slice(ch.index,ch.index+3).flatMap(q=>q.v.notes.map(n=>n.midi)),chValue('Tone'))}
 // A downstroke crosses all six strings in 50 ms; use the audio clock, not timers.
 function playChordStrum(q){
@@ -191,6 +242,6 @@ function pauseChords(){ch.token++;clearInterval(ch.timer);ch.timer=null;ch.runni
 
 setActiveTab=function(name,persist=true){pauseChords();pause();pauseFretboard();for(const key of ['position','fretboard','chord']){const active=name===key;$('#'+key+'Page').hidden=!active;$('#'+key+'TabButton').classList.toggle('active',active);$('#'+key+'TabButton').setAttribute('aria-selected',String(active))}savedActiveTab=name;if(persist)saveSettings()};
 $('#chordTabButton').onclick=()=>setActiveTab('chord');$('#chStart').onclick=()=>ch.running?pauseChords():startChords();$('#chReset').onclick=resetChords;
-chordPage.querySelectorAll('input,select').forEach(el=>el.onchange=()=>{if(['chAnswer','chClick','chSound','chTone'].includes(el.id)){stopActiveSounds();saveChords();renderChords();if(state.audio)void warmChords()}else resetChords()});$('#chBpm').oninput=()=>$('#chBpmValue').textContent=chValue('Bpm');chordPage.querySelectorAll('details').forEach(d=>d.ontoggle=saveChords);
+chordPage.querySelectorAll('input,select').forEach(el=>el.onchange=()=>{if(el.id==='chNotation'){saveChords();renderChords();return}if(['chAnswer','chClick','chSound','chTone'].includes(el.id)){stopActiveSounds();saveChords();renderChords();if(state.audio)void warmChords()}else resetChords()});$('#chBpm').oninput=()=>$('#chBpmValue').textContent=chValue('Bpm');chordPage.querySelectorAll('details').forEach(d=>d.ontoggle=saveChords);
 resetChords();
 if(initialPracticeTab==='chord')setActiveTab('chord');

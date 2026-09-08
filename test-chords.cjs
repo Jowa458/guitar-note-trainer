@@ -46,6 +46,22 @@ vm.runInContext(app.slice(0,app.indexOf('const notationMode='))+
   assert(!buildChordPool({...settings,manual:false}).some(q=>q.root===0&&q.type.id==='7'));
   console.log(JSON.stringify({voicings,musical,random,diatonic:'passed',mixed:'passed'},null,2));
 `,ctx);
+vm.runInContext(source.slice(source.indexOf('function chordSignature'),source.indexOf('function renderChordScore'))+`
+  assert.equal(chordSignature({contextId:'C:minor'}).name,'Cm');
+  assert.equal(chordSignature({contextId:'F♯:major'}).count,6);
+  assert.equal(chordSignature({contextId:'G♭:major'}).count,-6);
+  assert.equal(chordSignature({contextId:'manual'}).count,0);
+  const localAccidentals=new Map(),minorSignature=chordSignature({contextId:'C:minor'});
+  assert.equal(chordAccidental('Eb/4',localAccidentals,minorSignature),'');
+  assert.equal(chordAccidental('E/4',localAccidentals,minorSignature),'n');
+  assert.equal(chordAccidental('E/4',localAccidentals,minorSignature),'');
+  assert.equal(chordAccidental('Eb/4',localAccidentals,minorSignature),'b');
+  assert.equal(chordAccidental('Eb/5',localAccidentals,minorSignature),'');
+  assert.equal(chordAccidental('Eb/4',new Map(),minorSignature),'');
+  assert.equal(chordAccidental('Eb/4',new Map(),{count:0}),'b');
+  assert.equal(chordAccidental('F#/4',new Map(),chordSignature({contextId:'G:major'})),'');
+  console.log('Chord signatures and in-measure accidental restoration passed.');
+`,ctx);
 const timing=vm.createContext({assert});
 vm.runInContext(`
 const DURATION_SUBDIVISIONS={w:8,h:4,q:2,'8':1},DURATION_BEATS={w:4,h:2,q:1,'8':.5};
