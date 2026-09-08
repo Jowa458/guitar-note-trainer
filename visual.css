@@ -20,6 +20,12 @@ header p:not(.eyebrow) { color:#cbd4cd; font-size:.96rem; line-height:1.65; lett
 .choice-position-icon .mini-arrow { fill:none; stroke:#5d6962; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
 .choice-position-icon .mini-root { fill:#e62f35; stroke:#fff4f0; stroke-width:1.5; }
 .choice-position-icon .choice-root-string { fill:#e62f35; font:900 8px Arial,sans-serif; text-anchor:middle; }
+#chPositions { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; }
+#chPositions .position-choice span { display:grid; min-height:118px; padding:7px 3px 4px; place-items:center; gap:1px; }
+#chPositions .position-choice b { color:inherit; font-size:.72rem; line-height:1.1; }
+#chPositions .position-choice small { color:inherit; font-size:.62rem; line-height:1.1; }
+#chPositions .position-choice input:checked+span .mini-grid,#chPositions .position-choice input:checked+span .mini-arrow { stroke:var(--deep); }
+#chPositions .position-choice input:checked+span .choice-root-string { fill:#c9282d; }
 #positionChoices .position-choice input:checked+span .mini-grid,#positionChoices .position-choice input:checked+span .mini-arrow { stroke:var(--deep); }
 .position-strip small { font-size:.62rem; color:#687269; }
 .position-strip b { overflow:hidden; font:700 .82rem/1.2 Arial,sans-serif; white-space:nowrap; text-overflow:ellipsis; }

@@ -104,7 +104,7 @@ document.querySelector('main').append(chordPage);
 document.querySelector('.app-tabs').insertAdjacentHTML('beforeend','<button id="chordTabButton" role="tab" aria-selected="false" aria-controls="chordPage">和弦練習</button>');
 const ch={queue:[],index:0,sub:0,last:0,running:false,started:false,timer:null,token:0,pool:[]};
 TONIC_CHOICES.forEach(([label,pitch])=>$('#chRoots').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${pitch}" ${pitch===0?'checked':''}><span>${label}</span></label>`));
-POSITIONS.forEach((p,i)=>$('#chPositions').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${i}" ${i===0?'checked':''}><span>P${p.number}</span></label>`));
+POSITIONS.forEach((p,i)=>$('#chPositions').insertAdjacentHTML('beforeend',`<label class="position-choice"><input type="checkbox" value="${i}" ${i===0?'checked':''}><span><b>Position ${p.number}</b><small>${p.shape}</small>${positionChoiceIcon(p)}</span></label>`));
 CHORD_SCALE_IDS.forEach(id=>$('#chScales').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${id}" ${id==='major'?'checked':''}><span>${SCALES[id].label}</span></label>`));
 CHORD_FAMILIES.forEach(([id,label])=>$('#chTypes').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${id}" ${id==='triads'?'checked':''}><span>${label}</span></label>`));$('#chTypes').className='multi-choice-grid';
 TONIC_CHOICES.forEach(([label,pitch])=>$('#chManualRoots').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${pitch}" ${pitch===0?'checked':''}><span>${label}</span></label>`));
