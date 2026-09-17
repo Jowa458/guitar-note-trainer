@@ -133,7 +133,7 @@ function chordMoveWeight(candidate,previous,history){
   let repeatRun=0;for(let i=history.length-1;i>=0&&history[i].positionIndex===previous.positionIndex;i--)repeatRun++;
   // A held shape is allowed, but repeated stays progressively lose weight.
   let weight=distance<=1?1.1:distance<=3?1.3:distance<=5?.8:distance<=8?.4:.2;
-  if(samePosition)weight*=.85*Math.pow(.5,Math.max(0,repeatRun-1));
+  if(samePosition)weight*=.85*Math.pow(.5,Math.min(6,Math.max(0,repeatRun-1)));
   const held=candidate.v.frets.filter((f,s)=>f>=0&&f===previous.v.frets[s]).length;
   // A shared stopped/open string can remain in place, but must not dominate.
   weight*=1+Math.min(held,3)*.09;
@@ -159,16 +159,23 @@ function fillChords(){while(ch.queue.length<ch.index+7&&ch.pool.length){
     ch.queue.push({...item,v,originContextId:item.contextId,contextId:reference.contextId,contextLabel,name:item.rootLabel?item.rootLabel.replaceAll('#','♯').replaceAll('b','♭')+item.type.symbol:chordName(item.root,item.type)});
     continue;
   }
-  const previous=ch.queue.at(-1),available=ch.queue.length%chordsPerMeasure()&&previous?ch.pool.filter(q=>q.contextId===previous.contextId):ch.pool;
-  const different=previous?available.filter(q=>q.root!==previous.root||q.type.id!==previous.type.id):available;
-  const pool=different.length?different:available,groups=[...new Set(pool.map(q=>q.positionIndex))].map(positionIndex=>{
-    const candidates=pool.filter(q=>q.positionIndex===positionIndex).flatMap(item=>item.voicings.map(v=>({...item,v})));
-    return {candidates,weight:candidates.reduce((sum,q)=>sum+(previous?chordMoveWeight(q,previous,ch.queue):1),0)/candidates.length};
+  const previous=ch.queue.at(-1),identities=new Map();
+  for(const item of ch.pool){
+    const id=item.root+':'+item.type.id;if(!identities.has(id))identities.set(id,new Map());
+    for(const v of item.voicings){
+      const key=item.positionIndex+':'+v.frets.join(','),grips=identities.get(id);
+      if(!grips.has(key))grips.set(key,{v,positionIndex:item.positionIndex,root:item.root,type:item.type,representations:[]});
+      grips.get(key).representations.push(item);
+    }
+  }
+  const candidates=[...identities.values()].map(grips=>{
+    const choices=[...grips.values()].map(q=>({...q,weight:previous?chordMoveWeight(q,previous,ch.queue):1}));
+    return {choices,weight:choices.reduce((sum,q)=>sum+q.weight,0)/choices.length};
   });
-  // Pick position first so a position with more supported grips is not overrepresented.
-  const random=chValue('Mode')==='random'||!previous,group=random?choose(groups):weightedChoice(groups,g=>g.weight);
-  const item=random?choose(group.candidates):weightedChoice(group.candidates,q=>chordMoveWeight(q,previous,ch.queue));
-  ch.queue.push({...item,name:(item.rootLabel?item.rootLabel.replaceAll('#','♯').replaceAll('b','♭')+item.type.symbol:chordName(item.root,item.type))});
+  const target=weightedChoice(candidates,c=>c.weight),grip=weightedChoice(target.choices,q=>q.weight);
+  const item=choose(grip.representations),continuing=ch.queue.length%chordsPerMeasure()&&previous,reference=continuing?previous:item;
+  const contextLabel=continuing?previous.contextLabel:item.contextLabel+(new Set(ch.pool.map(q=>q.contextId)).size>1?'（混合出題）':'');
+  ch.queue.push({...item,v:grip.v,originContextId:item.contextId,contextId:reference.contextId,contextLabel,name:item.rootLabel?item.rootLabel.replaceAll('#','♯').replaceAll('b','♭')+item.type.symbol:chordName(item.root,item.type)});
 }}
 function resetChords(){
   pauseChords();for(const [id,f] of [['Roots','0'],['Scales','major'],['Types','triads'],['Positions','0'],['ManualRoots','0'],['ManualTypes','major'],['Sources','diatonic']])ensureChecked('#ch'+id,f);

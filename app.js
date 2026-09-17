@@ -1,5 +1,5 @@
 const $ = selector => document.querySelector(selector);
-const APP_VERSION = 'v91 · 每題等機率版';
+const APP_VERSION = 'v92 · 去重後單次加權';
 const POSITIONS = [
   { number: 1, shape: 'E shape', offset: 0, rootString: 6, direction: 'down' },
   { number: 2, shape: 'D shape', offset: 2, rootString: 4, direction: 'down' },
@@ -94,16 +94,37 @@ function spelledScale(key,scale){
   return scale.intervals.map((interval,index)=>{const letter=letters[(start+scale.degrees[index])%7],pitch=(key.pitch+interval)%12,difference=((pitch-NATURAL[letter]+18)%12)-6,accidental=difference===1?'#':difference===-1?'b':difference===2?'##':difference===-2?'bb':'';return{letter,accidental,pitch,name:letter+accidental,scaleIndex:index}});
 }
 
-function musicalLocation(locations,scaleNotes,context){
-  if(Math.random()<.14)return choose(locations);
-  const slot=context.slot,per=notesPerMeasure(),duration=DURATION_BEATS[rhythmSelect.value],beat=slot*duration,strong=beat===0||(+beatsSelect.value===4&&beat===2),ending=slot===per-1,lastMidi=context.lastMidi,lastDelta=context.lastDelta||0;
-  return weightedChoice(locations,note=>{
-    const midi=OPEN_MIDI[note.string]+note.fret,degree=scaleNotes.findIndex(scaleNote=>scaleNote.pitch===note.pitch),stable=degree===0||degree===2||degree===4;let weight=.8;
-    if(lastMidi==null)weight*=degree===0?5:degree===4?3.3:degree===2?2.6:1;
-    else{const delta=midi-lastMidi,distance=Math.abs(delta);weight*=distance===0?1:distance<=2?4.3:distance<=4?2.6:distance<=7?1.45:.4;if(Math.abs(lastDelta)>=4&&Math.sign(delta)===-Math.sign(lastDelta)&&distance<=2)weight*=2.5;if(Math.abs(lastDelta)<=2&&Math.sign(delta)===Math.sign(lastDelta)&&distance<=2)weight*=1.18}
-    if(strong&&stable)weight*=2.1;if(ending)weight*=degree===0?4.2:degree===4?2.1:degree===2?1.7:.72;
-    return weight*(.52+Math.random()*.96);
+function musicalNoteWeight(note,scaleNotes,context){
+  const slot=context.slot,per=notesPerMeasure(),duration=DURATION_BEATS[rhythmSelect.value],beat=slot*duration,strong=beat===0||beat===2,ending=slot===per-1,lastMidi=context.lastMidi,lastDelta=context.lastDelta||0;
+  const tone=scaleNotes.find(n=>n.pitch===note.pitch),letters='CDEFGAB';
+  const degree=(letters.indexOf(tone.letter)-letters.indexOf(scaleNotes[0].letter)+7)%7;
+  const stable=degree===0||degree===2||(degree===4&&(note.pitch-scaleNotes[0].pitch+12)%12===7);
+  const midi=OPEN_MIDI[note.string]+note.fret;let weight=.8;
+  if(lastMidi==null)weight*=degree===0?5:degree===4?3.3:degree===2?2.6:1;
+  else{const delta=midi-lastMidi,distance=Math.abs(delta);weight*=distance===0?1:distance<=2?4.3:distance<=4?2.6:distance<=7?1.45:.4;if(Math.abs(lastDelta)>=4&&Math.sign(delta)===-Math.sign(lastDelta)&&distance<=2)weight*=2.5;if(Math.abs(lastDelta)<=2&&Math.sign(delta)===Math.sign(lastDelta)&&distance<=2)weight*=1.18}
+  if(strong&&stable)weight*=2.1;if(ending)weight*=degree===0?4.2:degree===4?2.1:degree===2?1.7:.72;
+  return weight;
+}
+function musicalPitchCandidates(combos,context){
+  // Enharmonic spellings and repeated selections are the same musical source.
+  const sources=[...new Map(combos.map(combo=>[combo.key.pitch+':'+combo.scaleId,combo])).values()].map(combo=>spelledScale(combo.key,SCALES[combo.scaleId]));
+  const pitches=[...new Set(sources.flatMap(tones=>tones.map(t=>t.pitch)))];
+  const start=((context.key.pitch-4+12)%12)+POSITIONS[context.positionIndex].offset;
+  const reference=spelledScale(context.key,SCALES[context.scaleId]);
+  return pitches.map(pitch=>{
+    const roles=sources.filter(tones=>tones.some(t=>t.pitch===pitch)),tone=reference.find(t=>t.pitch===pitch)||roles[0].find(t=>t.pitch===pitch),locations=[];
+    for(let string=0;string<6;string++)for(let fret=start;fret<=start+3;fret++)if((OPEN_PITCH_CLASS[string]+fret)%12===pitch)locations.push({...tone,string,fret});
+    const scored=locations.map(note=>({note,weight:roles.reduce((sum,tones)=>sum+musicalNoteWeight(note,tones,context),0)/roles.length}));
+    // Duplicate locations for one exact pitch do not increase its octave weight.
+    const byMidi=new Map();scored.forEach(entry=>byMidi.set(OPEN_MIDI[entry.note.string]+entry.note.fret,entry.weight));
+    const weight=[...byMidi.values()].reduce((sum,w)=>sum+w,0)/byMidi.size;
+    return {pitch,weight,scored};
   });
+}
+function musicalLocationFromUnion(combos,context){
+  const candidates=musicalPitchCandidates(combos,context),explore=Math.random()<.14;
+  const chosen=explore?choose(candidates):weightedChoice(candidates,c=>c.weight*(.52+Math.random()*.96));
+  return (explore?choose(chosen.scored):weightedChoice(chosen.scored,c=>c.weight)).note;
 }
 
 let uniformNoteCache=null;
@@ -143,11 +164,10 @@ function buildQuestion(first=false){
     const previousPositionIndex=context?.positionIndex,nextPositionIndex=choosePositionIndex(selected,context,combo.key),positionDelta=previousPositionIndex==null?0:((combo.key.pitch-4+12)%12)+POSITIONS[nextPositionIndex].offset-(((context.key.pitch-4+12)%12)+POSITIONS[previousPositionIndex].offset);
     context={positionIndex:nextPositionIndex,positionRun:nextPositionIndex===previousPositionIndex?(context.positionRun||1)+1:1,lastPositionDelta:positionDelta||context?.lastPositionDelta||0,scaleId:combo.scaleId,key:combo.key,slot:0,last:'',lastMidi:context?.lastMidi??null,lastDelta:context?.lastDelta??0};
   }
-  const position=POSITIONS[context.positionIndex],scale=SCALES[context.scaleId],start=((context.key.pitch-4+12)%12)+position.offset,scaleNotes=spelledScale(context.key,scale),locations=[];
-  for(let string=0;string<6;string++)for(let fret=start;fret<=start+3;fret++){const note=scaleNotes.find(item=>item.pitch===(OPEN_PITCH_CLASS[string]+fret)%12);if(note)locations.push({...note,string,fret})}
-  const picked=generatorMode.value==='random'?choose(locations):musicalLocation(locations,scaleNotes,context),pickedMidi=OPEN_MIDI[picked.string]+picked.fret;
+  const position=POSITIONS[context.positionIndex],picked=musicalLocationFromUnion(combos,context),pickedMidi=OPEN_MIDI[picked.string]+picked.fret;
+  const mixed=new Set(combos.map(c=>c.key.pitch+':'+c.scaleId)).size>1,randomScopeLabel=mixed?`${context.key.label}${SCALES[context.scaleId].minor?'m':''} 調號 · 混合音階`:'';
   state.build={positionIndex:context.positionIndex,positionRun:context.positionRun,lastPositionDelta:context.lastPositionDelta||0,scaleId:context.scaleId,key:context.key,slot:(context.slot+1)%per,last:picked.name,lastMidi:pickedMidi,lastDelta:context.lastMidi==null?0:pickedMidi-context.lastMidi};
-  return {positionIndex:context.positionIndex,position,scaleId:context.scaleId,key:context.key,picked,slot:context.slot+1};
+  return {positionIndex:context.positionIndex,position,scaleId:context.scaleId,key:context.key,picked,slot:context.slot+1,randomScopeLabel};
 }
 
 function fillQueue(){while(state.queue.length<96)state.queue.push(buildQuestion(state.queue.length===0&&!state.history.length))}
