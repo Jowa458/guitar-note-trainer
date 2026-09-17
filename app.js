@@ -1,5 +1,5 @@
 const $ = selector => document.querySelector(selector);
-const APP_VERSION = 'v90 · 音名去重版';
+const APP_VERSION = 'v91 · 每題等機率版';
 const POSITIONS = [
   { number: 1, shape: 'E shape', offset: 0, rootString: 6, direction: 'down' },
   { number: 2, shape: 'D shape', offset: 2, rootString: 4, direction: 'down' },
@@ -59,16 +59,14 @@ function selectedScaleIds(){return checkedValues('#scaleChoices')}
 function selectedCombos(){return selectedScaleIds().flatMap(scaleId=>selectedTonicPitches().flatMap(pitch=>(SCALES[scaleId].minor?MINOR_LABELS[pitch]:MAJOR_LABELS[pitch]).map(label=>({scaleId,key:{label,pitch}}))))}
 function notesPerMeasure(){return +beatsSelect.value/DURATION_BEATS[rhythmSelect.value]}
 function choose(list){return list[Math.floor(Math.random()*list.length)]}
-// Sample musical identities before choosing a spelling, register or fingering.
-// Inside a retained measure context, inverse membership compensates overlap.
+// Every draw samples the complete union before any context or fingering.
 function makeUniformPool(groups){
   const counts=new Map();
   groups.forEach(group=>{for(const id of group.options.keys())counts.set(id,(counts.get(id)||0)+1)});
   return {groups,counts,ids:[...counts.keys()]};
 }
-function drawUniform(pool,group=null){
-  const id=group?weightedChoice([...group.options.keys()],id=>1/pool.counts.get(id)):choose(pool.ids);
-  group||=choose(pool.groups.filter(g=>g.options.has(id)));
+function drawUniform(pool){
+  const id=choose(pool.ids),group=choose(pool.groups.filter(g=>g.options.has(id)));
   return {group,item:choose(group.options.get(id))};
 }
 function weightedChoice(items,weightFor){let total=0,weighted=items.map(item=>{const weight=Math.max(0,weightFor(item));total+=weight;return{item,total}}),roll=Math.random()*total;return(weighted.find(entry=>roll<entry.total)||weighted.at(-1)).item}
@@ -125,10 +123,16 @@ function uniformNotePool(){
 function buildUniformQuestion(first){
   const previous=state.build,per=notesPerMeasure(),pool=uniformNotePool();
   const continuing=!first&&previous?.slot>0&&pool.groups.includes(previous.randomGroup);
-  const {group,item:picked}=drawUniform(pool,continuing?previous.randomGroup:null);
-  const slot=continuing?previous.slot:0,positionIndex=group.positionIndex,midi=OPEN_MIDI[picked.string]+picked.fret;
+  const draw=drawUniform(pool),group=continuing?previous.randomGroup:draw.group;
+  const slot=continuing?previous.slot:0,positionIndex=group.positionIndex;
+  const referenceTone=spelledScale(group.key,SCALES[group.scaleId]).find(n=>n.pitch===draw.item.pitch),tone=referenceTone||draw.item;
+  const start=((group.key.pitch-4+12)%12)+POSITIONS[positionIndex].offset,locations=[];
+  for(let string=0;string<6;string++)for(let fret=start;fret<=start+3;fret++)if((OPEN_PITCH_CLASS[string]+fret)%12===tone.pitch)locations.push({...tone,string,fret});
+  const picked=choose(locations),midi=OPEN_MIDI[picked.string]+picked.fret;
+  const mixed=new Set(pool.groups.map(g=>g.key.label+':'+g.scaleId)).size>1;
+  const randomScopeLabel=mixed?`${group.key.label}${SCALES[group.scaleId].minor?'m':''} 調號 · 混合音階`:'';
   state.build={positionIndex,scaleId:group.scaleId,key:group.key,slot:(slot+1)%per,randomGroup:group,last:picked.name,lastMidi:midi,lastDelta:previous?.lastMidi==null?0:midi-previous.lastMidi};
-  return {positionIndex,position:POSITIONS[positionIndex],scaleId:group.scaleId,key:group.key,picked,slot:slot+1};
+  return {positionIndex,position:POSITIONS[positionIndex],scaleId:group.scaleId,key:group.key,picked,slot:slot+1,randomScopeLabel};
 }
 function buildQuestion(first=false){
   if(generatorMode.value==='random')return buildUniformQuestion(first);
@@ -171,10 +175,10 @@ function renderScore(){
     const x=8+header+measure*minMeasureWidth,staff=new VF.Stave(x,staffY,minMeasureWidth).setBegBarType(VF.Barline.type.NONE),tab=new VF.TabStave(x,tabY,minMeasureWidth).setBegBarType(VF.Barline.type.NONE),group=shown.slice(measure*per,(measure+1)*per),staffNotes=[],tabNotes=[],octaveEntries=[],singletonEntries=[];
     if(useSignature&&group[0]){const signature=keySignature(group[0]);if(!previousSignature||signature!==previousSignature)try{staff.addKeySignature(signature,previousSignature||undefined)}catch(error){console.warn('Key signature unavailable',error)}previousSignature=signature}
     staff.setContext(ctx).draw();tab.setContext(ctx).draw();if(group[0])labels.push(group[0]);
-    const pitches=group.map(writtenPitch),shiftRuns=[];pitches.forEach((pitch,index)=>{if(!pitch.octaveShift)return;const run=shiftRuns.at(-1);if(run&&run.shift===pitch.octaveShift&&run.lastIndex+1===index)run.lastIndex=index;else shiftRuns.push({shift:pitch.octaveShift,firstIndex:index,lastIndex:index})});
+    const measureAccidentals=new Map(),pitches=group.map(writtenPitch),shiftRuns=[];pitches.forEach((pitch,index)=>{if(!pitch.octaveShift)return;const run=shiftRuns.at(-1);if(run&&run.shift===pitch.octaveShift&&run.lastIndex+1===index)run.lastIndex=index;else shiftRuns.push({shift:pitch.octaveShift,firstIndex:index,lastIndex:index})});
     group.forEach((question,index)=>{
       const pitch=pitches[index],absolute=page+measure*per+index,isCurrent=absolute===currentIndex,sn=new VF.StaveNote({clef:'treble',keys:[pitch.key],duration,autoStem:true}),tn=new VF.TabNote({positions:[{str:6-question.picked.string,fret:String(question.picked.fret)}],duration});
-      const shownAccidental=accidentalToDraw(question,useSignature);if(shownAccidental)sn.addModifier(new VF.Accidental(shownAccidental),0);
+      const identity=question.picked.letter+pitch.key.split('/')[1],desired=question.picked.accidental,expected=measureAccidentals.has(identity)?measureAccidentals.get(identity):useSignature?signatureAccidental(group[0],question.picked.letter):'';const shownAccidental=desired===expected?'':desired||'n';measureAccidentals.set(identity,desired);if(shownAccidental)sn.addModifier(new VF.Accidental(shownAccidental),0);
       const singleton=shiftRuns.find(run=>run.firstIndex===index&&run.lastIndex===index);if(singleton)singletonEntries.push({note:sn,shift:singleton.shift});
       if(isCurrent){const red={fillStyle:'#d62f2f',strokeStyle:'#d62f2f'};sn.setStyle(red);if(typeof sn.setKeyStyle==='function')sn.setKeyStyle(0,red);if(typeof sn.setStemStyle==='function')sn.setStemStyle(red);tn.setStyle(red)}
       if(pitch.octaveShift)octaveEntries.push({note:sn,shift:pitch.octaveShift,index});
@@ -191,7 +195,7 @@ function renderScore(){
   const currentMeasure=Math.floor((currentIndex-page)/per),strip=$('#positionStrip');strip.innerHTML='';
   $('#scorePanel > p').textContent='目前 2 小節　｜　預告 1 小節';
   const svg=target.querySelector('svg');svg.setAttribute('viewBox',`0 0 ${logicalWidth} ${height}`);svg.setAttribute('preserveAspectRatio','xMinYMin meet');svg.style.width='100%';svg.style.height='auto';
-  const labelMarkup=labels.map((question,index)=>{const x=8+header+index*minMeasureWidth,scale=SCALES[question.scaleId],tonic=`${question.key.label}${scale.minor?'m':''}`;return `<g class="measure-label"><text x="${x+minMeasureWidth/2}" y="28">${tonic} · ${scale.label}</text></g>`}).join('');
+  const labelMarkup=labels.map((question,index)=>{const x=8+header+index*minMeasureWidth,scale=SCALES[question.scaleId],tonic=`${question.key.label}${scale.minor?'m':''}`;return `<g class="measure-label"><text x="${x+minMeasureWidth/2}" y="28">${question.randomScopeLabel||`${tonic} · ${scale.label}`}</text></g>`}).join('');
   const stringLines=Array.from({length:6},(_,index)=>`<line x1="${12+index*10}" y1="13" x2="${12+index*10}" y2="69"/>`).join(''),fretLines=[13,27,41,55,69].map(y=>`<line x1="8" y1="${y}" x2="66" y2="${y}"/>`).join('');
   $('#positionCues').innerHTML=labels.map((question,index)=>{const position=question.position,stringX=12+(6-position.rootString)*10,arrow=position.direction==='up'?'<path d="M 37 36 V 15 M 37 15 l -5 6 M 37 15 l 5 6"/>':'<path d="M 37 46 V 67 M 37 67 l -5 -6 M 37 67 l 5 -6"/>',numbers=[6,5,4,3,2,1].map((number,stringIndex)=>`<text${number===position.rootString?' class="root-string-number"':''} x="${12+stringIndex*10}" y="80">${number}</text>`).join(''),current=index===currentMeasure;return `<div class="position-cue-dom${current?' current':''}" aria-label="Position ${position.number} ${position.shape}，${position.rootString} 弦根音，往${position.direction==='up'?'上':'下'}按"${current?' aria-current="true"':''}><svg class="mini-position-tab" viewBox="0 0 74 84" aria-hidden="true"><g class="mini-grid">${stringLines}${fretLines}</g><g class="mini-arrow">${arrow}</g><circle class="mini-root" cx="${stringX}" cy="41" r="5.5"/>${numbers}</svg></div>`}).join('');
   svg.insertAdjacentHTML('afterbegin',labelMarkup);
@@ -200,7 +204,7 @@ function renderScore(){
 }
 
 function drawBeatDots(){const root=$('#beatDots'),active=Math.floor(state.lastSubdivision/2);root.innerHTML='';for(let beat=0;beat<+beatsSelect.value;beat++){const marker=beat===active?(state.running?'active':state.started?'paused':''):'';root.insertAdjacentHTML('beforeend',`<i class="beat-dot ${marker}"></i>`)}}
-function render(){const question=state.history.at(-1);if(!question)return;const scale=SCALES[question.scaleId];$('#currentPosition').textContent=`Position ${question.position.number} · ${question.position.shape}`;$('#questionCounter').textContent=`第 ${question.slot} 音 / ${notesPerMeasure()} 音`;$('#scaleDescription').textContent=`${question.key.label}${scale.minor?'m':''} ${scale.label}`;try{renderScore()}catch(error){console.error(error);$('#score').innerHTML='<p class="score-error">樂譜載入失敗，請重新整理。</p>'}drawBeatDots()}
+function render(){const question=state.history.at(-1);if(!question)return;const scale=SCALES[question.scaleId];$('#currentPosition').textContent=`Position ${question.position.number} · ${question.position.shape}`;$('#questionCounter').textContent=`第 ${question.slot} 音 / ${notesPerMeasure()} 音`;$('#scaleDescription').textContent=question.randomScopeLabel||`${question.key.label}${scale.minor?'m':''} ${scale.label}`;try{renderScore()}catch(error){console.error(error);$('#score').innerHTML='<p class="score-error">樂譜載入失敗，請重新整理。</p>'}drawBeatDots()}
 
 function updateSharedVolumes(){
   for(const [id,bus] of [['metroVolume',metroBus],['noteVolume',noteBus]]){

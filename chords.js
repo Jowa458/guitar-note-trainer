@@ -153,9 +153,10 @@ function uniformChordPool(){
 }
 function fillChords(){while(ch.queue.length<ch.index+7&&ch.pool.length){
   if(chValue('Mode')==='random'){
-    const pool=uniformChordPool(),previous=ch.queue.at(-1),group=ch.queue.length%chordsPerMeasure()&&previous?pool.groups.find(g=>g.contextId===previous.contextId):null;
-    const {item}=drawUniform(pool,group),v=choose(item.voicings);
-    ch.queue.push({...item,v,name:item.rootLabel?item.rootLabel.replaceAll('#','♯').replaceAll('b','♭')+item.type.symbol:chordName(item.root,item.type)});
+    const pool=uniformChordPool(),previous=ch.queue.at(-1),continuing=ch.queue.length%chordsPerMeasure()&&previous;
+    const {item}=drawUniform(pool),v=choose(item.voicings),reference=continuing?previous:item;
+    const contextLabel=continuing?previous.contextLabel:reference.contextLabel+(pool.groups.length>1?'（混合出題）':'');
+    ch.queue.push({...item,v,originContextId:item.contextId,contextId:reference.contextId,contextLabel,name:item.rootLabel?item.rootLabel.replaceAll('#','♯').replaceAll('b','♭')+item.type.symbol:chordName(item.root,item.type)});
     continue;
   }
   const previous=ch.queue.at(-1),available=ch.queue.length%chordsPerMeasure()&&previous?ch.pool.filter(q=>q.contextId===previous.contextId):ch.pool;

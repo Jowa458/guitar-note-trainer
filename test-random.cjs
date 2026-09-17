@@ -9,13 +9,15 @@ vm.runInContext(app.slice(0,app.indexOf('const notationMode='))+
   let combos=[{key:{label:'A',pitch:9},scaleId:'major'},{key:{label:'A',pitch:9},scaleId:'minor'}],per=4;
   const selectedCombos=()=>combos,selectedPositions=()=>[0,1,2,3,4],notesPerMeasure=()=>per,state={build:null};
   const pool=uniformNotePool();assert.equal(pool.ids.length,10);
-  // Exact marginal probabilities when a measure retains its context.
-  const probabilities=new Map(pool.ids.map(id=>[id,0]));
-  for(const group of pool.groups){
-    const mass=[...group.options.keys()].reduce((sum,id)=>sum+1/pool.counts.get(id),0);
-    for(const id of group.options.keys())probabilities.set(id,probabilities.get(id)+(mass/pool.ids.length)*(1/pool.counts.get(id)/mass));
-  }
-  probabilities.forEach(p=>assert(Math.abs(p-.1)<1e-12));
+  // Every one of the ten equal random intervals remains available on beat 2,
+  // even when the reference signature is the minor scale.
+  const seededRandom=Math.random,minorGroup=pool.groups.find(g=>g.scaleId==='minor');
+  pool.ids.forEach((pitch,index)=>{
+    state.build={slot:1,randomGroup:minorGroup,lastMidi:60};let call=0;
+    Math.random=()=>call++===0?(index+.5)/pool.ids.length:.5;
+    const q=buildUniformQuestion(false);assert.equal(q.picked.pitch,pitch);assert.equal(q.scaleId,'minor');assert(q.randomScopeLabel.includes('混合'));
+  });
+  Math.random=seededRandom;
   const report={};
   for(per of [1,2,4,8]){
     state.build=null;const counts=new Map(pool.ids.map(id=>[id,0]));
@@ -24,7 +26,8 @@ vm.runInContext(app.slice(0,app.indexOf('const notationMode='))+
       for(let slot=0;slot<per;slot++){
         const q=buildUniformQuestion(false);first||=q;
         assert.equal(q.key.label,first.key.label);assert.equal(q.scaleId,first.scaleId);assert.equal(q.positionIndex,first.positionIndex);
-        assert(SCALES[q.scaleId].intervals.includes((q.picked.pitch-q.key.pitch+12)%12));
+        assert(pool.ids.includes(q.picked.pitch));
+        assert.equal((OPEN_PITCH_CLASS[q.picked.string]+q.picked.fret)%12,q.picked.pitch);
         counts.set(q.picked.pitch,counts.get(q.picked.pitch)+1);
       }
     }
@@ -33,6 +36,8 @@ vm.runInContext(app.slice(0,app.indexOf('const notationMode='))+
   }
   // Duplicating a source does not change the exact target probabilities.
   combos=[...combos,combos[0],combos[0]];assert.equal(uniformNotePool().ids.length,10);
+  // Every four-fret reference position can represent the entire chromatic union.
+  for(let start=0;start<24;start++)for(let pitch=0;pitch<12;pitch++)assert(OPEN_PITCH_CLASS.some(open=>[0,1,2,3].some(offset=>(open+start+offset)%12===pitch)));
   // An identity with many fingerings is still counted once.
   const artificial=makeUniformPool([{options:new Map([['A',Array(100).fill('A')],['B',['B']]])},{options:new Map([['A',['A']],['C',['C']]])}]);
   assert.equal(artificial.ids.length,3);assert.equal(artificial.counts.get('A'),2);
