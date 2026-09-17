@@ -140,7 +140,24 @@ function chordMoveWeight(candidate,previous,history){
   if(candidate.root===previous.root&&candidate.type.id===previous.type.id&&candidate.v.frets.every((f,s)=>f===previous.v.frets[s]))weight*=.4;
   return weight;
 }
+let uniformChordCache=null;
+function uniformChordPool(){
+  if(uniformChordCache?.source===ch.pool)return uniformChordCache.pool;
+  const contexts=new Map();
+  for(const item of ch.pool){
+    if(!contexts.has(item.contextId))contexts.set(item.contextId,{contextId:item.contextId,options:new Map()});
+    const options=contexts.get(item.contextId).options,id=item.root+':'+item.type.id;
+    if(!options.has(id))options.set(id,[]);options.get(id).push(item);
+  }
+  const pool=makeUniformPool([...contexts.values()]);uniformChordCache={source:ch.pool,pool};return pool;
+}
 function fillChords(){while(ch.queue.length<ch.index+7&&ch.pool.length){
+  if(chValue('Mode')==='random'){
+    const pool=uniformChordPool(),previous=ch.queue.at(-1),group=ch.queue.length%chordsPerMeasure()&&previous?pool.groups.find(g=>g.contextId===previous.contextId):null;
+    const {item}=drawUniform(pool,group),v=choose(item.voicings);
+    ch.queue.push({...item,v,name:item.rootLabel?item.rootLabel.replaceAll('#','♯').replaceAll('b','♭')+item.type.symbol:chordName(item.root,item.type)});
+    continue;
+  }
   const previous=ch.queue.at(-1),available=ch.queue.length%chordsPerMeasure()&&previous?ch.pool.filter(q=>q.contextId===previous.contextId):ch.pool;
   const different=previous?available.filter(q=>q.root!==previous.root||q.type.id!==previous.type.id):available;
   const pool=different.length?different:available,groups=[...new Set(pool.map(q=>q.positionIndex))].map(positionIndex=>{

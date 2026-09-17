@@ -57,6 +57,18 @@ function selectedScaleIds(){return checkedValues('#scaleChoices')}
 function selectedCombos(){return selectedScaleIds().flatMap(scaleId=>selectedTonicPitches().flatMap(pitch=>(SCALES[scaleId].minor?MINOR_LABELS[pitch]:MAJOR_LABELS[pitch]).map(label=>({scaleId,key:{label,pitch}}))))}
 function notesPerMeasure(){return +beatsSelect.value/DURATION_BEATS[rhythmSelect.value]}
 function choose(list){return list[Math.floor(Math.random()*list.length)]}
+// Sample musical identities before choosing a spelling, register or fingering.
+// Inside a retained measure context, inverse membership compensates overlap.
+function makeUniformPool(groups){
+  const counts=new Map();
+  groups.forEach(group=>{for(const id of group.options.keys())counts.set(id,(counts.get(id)||0)+1)});
+  return {groups,counts,ids:[...counts.keys()]};
+}
+function drawUniform(pool,group=null){
+  const id=group?weightedChoice([...group.options.keys()],id=>1/pool.counts.get(id)):choose(pool.ids);
+  group||=choose(pool.groups.filter(g=>g.options.has(id)));
+  return {group,item:choose(group.options.get(id))};
+}
 function weightedChoice(items,weightFor){let total=0,weighted=items.map(item=>{const weight=Math.max(0,weightFor(item));total+=weight;return{item,total}}),roll=Math.random()*total;return(weighted.find(entry=>roll<entry.total)||weighted.at(-1)).item}
 function updateDurationOptions(){const beats=+beatsSelect.value;[...rhythmSelect.options].forEach(option=>option.disabled=beats%DURATION_BEATS[option.value]!==0);if(rhythmSelect.options[rhythmSelect.selectedIndex].disabled)rhythmSelect.value='q'}
 function choosePositionIndex(selected,context,nextKey=context?.key){
@@ -94,7 +106,30 @@ function musicalLocation(locations,scaleNotes,context){
   });
 }
 
+let uniformNoteCache=null;
+function uniformNotePool(){
+  const combos=selectedCombos(),positions=selectedPositions(),cacheKey=JSON.stringify([combos,positions]);
+  if(uniformNoteCache?.key===cacheKey)return uniformNoteCache.pool;
+  const groups=combos.flatMap(combo=>positions.map(positionIndex=>{
+    const options=new Map(),start=((combo.key.pitch-4+12)%12)+POSITIONS[positionIndex].offset,tones=spelledScale(combo.key,SCALES[combo.scaleId]);
+    for(let string=0;string<6;string++)for(let fret=start;fret<=start+3;fret++){
+      const tone=tones.find(n=>n.pitch===(OPEN_PITCH_CLASS[string]+fret)%12);if(!tone)continue;
+      if(!options.has(tone.pitch))options.set(tone.pitch,[]);options.get(tone.pitch).push({...tone,string,fret});
+    }
+    return {...combo,positionIndex,options};
+  })).filter(g=>g.options.size);
+  const pool=makeUniformPool(groups);uniformNoteCache={key:cacheKey,pool};return pool;
+}
+function buildUniformQuestion(first){
+  const previous=state.build,per=notesPerMeasure(),pool=uniformNotePool();
+  const continuing=!first&&previous?.slot>0&&pool.groups.includes(previous.randomGroup);
+  const {group,item:picked}=drawUniform(pool,continuing?previous.randomGroup:null);
+  const slot=continuing?previous.slot:0,positionIndex=group.positionIndex,midi=OPEN_MIDI[picked.string]+picked.fret;
+  state.build={positionIndex,scaleId:group.scaleId,key:group.key,slot:(slot+1)%per,randomGroup:group,last:picked.name,lastMidi:midi,lastDelta:previous?.lastMidi==null?0:midi-previous.lastMidi};
+  return {positionIndex,position:POSITIONS[positionIndex],scaleId:group.scaleId,key:group.key,picked,slot:slot+1};
+}
 function buildQuestion(first=false){
+  if(generatorMode.value==='random')return buildUniformQuestion(first);
   const per=notesPerMeasure(),selected=selectedPositions(),combos=selectedCombos();let context=state.build;
   const comboStillSelected=context&&combos.some(combo=>combo.scaleId===context.scaleId&&combo.key.label===context.key.label);
   if(first||!context||context.slot===0||!selected.includes(context.positionIndex)||!comboStillSelected){
