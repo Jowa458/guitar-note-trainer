@@ -1,4 +1,5 @@
 const $ = selector => document.querySelector(selector);
+const APP_VERSION = 'v90 · 音名去重版';
 const POSITIONS = [
   { number: 1, shape: 'E shape', offset: 0, rootString: 6, direction: 'down' },
   { number: 2, shape: 'D shape', offset: 2, rootString: 4, direction: 'down' },
@@ -50,6 +51,7 @@ POSITIONS.forEach((position,index)=>$('#positionChoices').insertAdjacentHTML('be
 TONIC_CHOICES.forEach(([label,pitch])=>$('#keyChoices').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${pitch}" ${pitch===9?'checked':''}><span>${label}</span></label>`));
 Object.entries(SCALES).forEach(([id,scale])=>$('#scaleChoices').insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${id}" ${id==='major'?'checked':''}><span>${scale.label}</span></label>`));
 
+$('#appVersion').textContent=APP_VERSION;
 function selectedPositions(){return [...document.querySelectorAll('#positionChoices input:checked')].map(input=>+input.value)}
 function checkedValues(selector){return [...document.querySelectorAll(`${selector} input:checked`)].map(input=>input.value)}
 function selectedTonicPitches(){return checkedValues('#keyChoices').map(Number)}
